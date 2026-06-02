@@ -589,6 +589,9 @@
 
     <script>
         // 评论提交（带 loading + toast）
+        // 图片灯箱
+        const lightbox = GLightbox({ selector: '.glightbox', touchNavigation: true, loop: true });
+
         async function submitComment(e) {
             e.preventDefault();
             var form = e.target;
