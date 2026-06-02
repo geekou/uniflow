@@ -4,6 +4,7 @@ import (
 	"database/sql"
 	"fmt"
 	"log"
+	"time"
 
 	_ "modernc.org/sqlite"
 
@@ -61,6 +62,14 @@ func InitDB(dbPath string) error {
 	// 不再自动创建默认管理员，由首次部署引导页处理
 	// 默认菜单
 	seedDefaultMenus(DB)
+
+	// 建站时间（如果未设置则默认当天）
+	var founded string
+	DB.QueryRow("SELECT value FROM system_settings WHERE key='site_founded_at'").Scan(&founded)
+	if founded == "" {
+		DB.Exec("INSERT INTO system_settings (key, value) VALUES ('site_founded_at', ?)",
+			time.Now().Format("2006-01-02T15:04"))
+	}
 
 	log.Println("[DB] All tables created and seeded successfully")
 	return nil
