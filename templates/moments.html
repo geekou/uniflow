@@ -254,6 +254,7 @@
                                                     <span class="text-xs text-gray-400">{{relativeTime .CreatedAt}}</span>
                                                 </div>
                                                 <p class="text-sm text-gray-600 mt-1">{{.Content}}</p>
+                                                {{if .ImageURL}}<a href="{{.ImageURL}}" class="glightbox block mt-1"><img src="{{.ImageURL}}" alt="comment-img" class="max-h-32 rounded-lg border border-gray-200"></a>{{end}}
                                                 <!-- 子回复 -->
                                                 {{$parentID := .ID}}
                                                 {{range $allComments}}
@@ -264,6 +265,7 @@
                                                         <span class="text-[10px] text-gray-400">{{relativeTime .CreatedAt}}</span>
                                                     </div>
                                                     <p class="text-xs text-gray-500 mt-0.5">{{if .ReplyTo}}<span class="text-indigo-400">↩ @{{.ReplyTo}}</span> {{end}}{{.Content}}</p>
+                                                    {{if .ImageURL}}<a href="{{.ImageURL}}" class="glightbox block mt-1"><img src="{{.ImageURL}}" alt="comment-img" class="max-h-24 rounded-lg border border-gray-200"></a>{{end}}
                                                 </div>
                                                 {{end}}
                                                 {{end}}
