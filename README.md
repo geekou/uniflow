@@ -89,6 +89,22 @@ docker compose up -d
 
 设置完成后自动跳转后台管理面板。
 
+### 添加导航菜单
+
+Setup 完成后左侧菜单是空的，进后台添加：
+
+1. 打开 `http://IP:9090/admin/menus`
+2. 依次添加四个菜单：
+
+| 名称 | 路径 | 图标 | 排序 |
+|------|------|------|------|
+| 首页 | `/` | `fa-solid fa-house` | 1 |
+| 文章 | `/posts` | `fa-solid fa-book` | 2 |
+| 瞬间 | `/moments` | `fa-solid fa-bolt` | 3 |
+| 留言板 | `/guestbook` | `fa-regular fa-envelope` | 4 |
+
+图标名来自 [Font Awesome 6](https://fontawesome.com/icons)，直接复制即可。
+
 ### 默认端口
 - 博客前台：`http://IP:9090`
 - 后台管理：`http://IP:9090/admin`
