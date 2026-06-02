@@ -1,6 +1,6 @@
 services:
   uniflow:
-    image: ghcr.io/geekou/uniflow:latest
+    image: geekou/uniflow:latest
     container_name: uniflow
     restart: unless-stopped
     ports:
