@@ -80,7 +80,7 @@ docker compose up -d
 
 ### 初始化
 
-浏览器打开 `http://你的服务器IP:8080/setup`，设置：
+浏览器打开 `http://你的服务器IP:9090/setup`，设置：
 - 站点名称
 - 昵称
 - 管理员用户名和密码（至少 6 位）
@@ -88,8 +88,8 @@ docker compose up -d
 设置完成后自动跳转后台管理面板。
 
 ### 默认端口
-- 博客前台：`http://IP:8080`
-- 后台管理：`http://IP:8080/admin`
+- 博客前台：`http://IP:9090`
+- 后台管理：`http://IP:9090/admin`
 
 ---
 
@@ -102,7 +102,7 @@ services:
     container_name: uniflow
     restart: unless-stopped
     ports:
-      - "8080:8080"
+      - "9090:9090"
     volumes:
       - ./data:/app/data       # SQLite 数据库持久化
       - ./uploads:/app/uploads  # 上传文件持久化
@@ -122,7 +122,7 @@ services:
 # 安装依赖
 go mod download
 
-# 本地运行（默认 Debug 模式，端口 8080）
+# 本地运行（默认端口 9090，Debug 需设 GIN_MODE=debug）
 go run .
 
 # 编译
