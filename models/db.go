@@ -59,8 +59,32 @@ func InitDB(dbPath string) error {
 	}
 
 	// 不再自动创建默认管理员，由首次部署引导页处理
+	// 默认菜单
+	seedDefaultMenus(DB)
+
 	log.Println("[DB] All tables created and seeded successfully")
 	return nil
+}
+
+// seedDefaultMenus 写入默认菜单（首次启动时）
+func seedDefaultMenus(db *sql.DB) {
+	menus := []struct {
+		name, url, icon string
+		orderNum        int
+	}{
+		{"首页", "/", "fa-solid fa-house", 1},
+		{"文章", "/posts", "fa-solid fa-book", 2},
+		{"瞬间", "/moments", "fa-solid fa-bolt", 3},
+		{"留言板", "/guestbook", "fa-regular fa-envelope", 4},
+	}
+	for _, m := range menus {
+		var count int
+		db.QueryRow("SELECT COUNT(*) FROM menus WHERE url = ?", m.url).Scan(&count)
+		if count == 0 {
+			db.Exec("INSERT INTO menus (name, url, icon, order_num) VALUES (?, ?, ?, ?)",
+				m.name, m.url, m.icon, m.orderNum)
+		}
+	}
 }
 
 // CloseDB 关闭数据库连接
