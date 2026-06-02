@@ -1,0 +1,155 @@
+{{template "admin_head" .}}
+    <div class="flex items-center justify-between mb-6">
+        <h2 class="text-lg font-bold">用户管理</h2>
+    </div>
+
+    <!-- Add User -->
+    <div class="bg-white rounded-2xl p-6 shadow-xs border border-gray-100/50 mb-6">
+        <h3 class="text-sm font-bold text-gray-500 mb-4">新增用户</h3>
+        <form method="POST" action="/admin/users/save" class="flex items-end space-x-3">
+            <div class="flex-1">
+                <label class="text-xs font-medium text-gray-500 mb-1 block">用户名</label>
+                <input type="text" name="username" required class="w-full border border-gray-200 rounded-xl px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-indigo-200 focus:border-indigo-400">
+            </div>
+            <div class="flex-1">
+                <label class="text-xs font-medium text-gray-500 mb-1 block">密码</label>
+                <input type="password" name="password" required class="w-full border border-gray-200 rounded-xl px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-indigo-200 focus:border-indigo-400">
+            </div>
+            <div class="flex-1">
+                <label class="text-xs font-medium text-gray-500 mb-1 block">角色</label>
+                <select name="role" class="w-full border border-gray-200 rounded-xl px-3 py-2 text-sm outline-none">
+                    <option value="admin">管理员</option>
+                    <option value="editor" selected>编辑</option>
+                </select>
+            </div>
+            <button type="submit" class="bg-indigo-600 text-white text-xs px-5 py-2 rounded-xl font-medium hover:bg-indigo-700 transition">添加</button>
+        </form>
+    </div>
+
+    <!-- User List -->
+    <div class="bg-white rounded-2xl shadow-xs border border-gray-100/50 overflow-hidden">
+        <table class="w-full text-sm">
+            <thead class="bg-gray-50/50 text-xs text-gray-400">
+                <tr><th class="text-left px-5 py-3">ID</th><th class="text-left px-5 py-3">头像</th><th class="text-left px-5 py-3">用户名</th><th class="text-left px-5 py-3">角色</th><th class="text-left px-5 py-3">创建时间</th><th class="text-left px-5 py-3">操作</th></tr>
+            </thead>
+            <tbody class="divide-y divide-gray-50">
+                {{range .Users}}
+                <tr class="hover:bg-gray-50/50 transition">
+                    <td class="px-5 py-3 text-xs text-gray-400">{{.ID}}</td>
+                    <td class="px-5 py-3">
+                        {{if .AvatarURL}}<img src="{{.AvatarURL}}" class="w-8 h-8 rounded-full object-cover">
+                        {{else}}<div class="w-8 h-8 rounded-full bg-gradient-to-br from-indigo-400 to-purple-500 flex items-center justify-center text-white text-xs font-bold">{{index .Username 0}}</div>{{end}}
+                    </td>
+                    <td class="px-5 py-3 font-medium text-gray-700">{{.Username}}</td>
+                    <td class="px-5 py-3 text-xs">
+                        {{if eq .Role "admin"}}<span class="bg-red-50 text-red-500 px-2 py-0.5 rounded-full font-medium">管理员</span>
+                        {{else}}<span class="bg-blue-50 text-blue-500 px-2 py-0.5 rounded-full font-medium">编辑</span>{{end}}
+                    </td>
+                    <td class="px-5 py-3 text-xs text-gray-400">{{formatDate .CreatedAt}}</td>
+                    <td class="px-5 py-3">
+                        <button onclick="showEditUser({{.ID}}, '{{.Username}}', '{{.Role}}', '{{.AvatarURL}}')" class="text-xs text-indigo-400 hover:text-indigo-600 mr-2" title="编辑"><i class="fa-solid fa-pen-to-square"></i></button>
+                        <button onclick="showResetPw({{.ID}}, '{{.Username}}')" class="text-xs text-amber-400 hover:text-amber-600 mr-2" title="修改密码"><i class="fa-solid fa-key"></i></button>
+                        <button onclick="confirmAction('确定删除此用户？', '/admin/users/delete/{{.ID}}')" class="text-xs text-red-400 hover:text-red-600" title="删除"><i class="fa-solid fa-trash"></i></button>
+                    </td>
+                </tr>
+                {{end}}
+            </tbody>
+        </table>
+    </div>
+{{template "admin_tail" .}}
+
+<!-- 编辑用户弹窗 -->
+<div id="edit-user-modal" class="fixed inset-0 bg-black/40 z-50 hidden flex items-center justify-center">
+    <div class="bg-white rounded-2xl p-6 w-96 shadow-xl">
+        <h3 class="text-sm font-bold text-gray-700 mb-4">编辑用户</h3>
+        <input type="hidden" id="edit-user-id">
+        <div class="mb-3">
+            <label class="text-xs font-medium text-gray-500 mb-1 block">用户名</label>
+            <input type="text" id="edit-username" class="w-full border border-gray-200 rounded-xl px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-indigo-200 focus:border-indigo-400">
+        </div>
+        <div class="mb-3">
+            <label class="text-xs font-medium text-gray-500 mb-1 block">角色</label>
+            <select id="edit-role" class="w-full border border-gray-200 rounded-xl px-3 py-2 text-sm outline-none">
+                <option value="admin">管理员</option>
+                <option value="editor">编辑</option>
+            </select>
+        </div>
+        <div class="mb-4">
+            <label class="text-xs font-medium text-gray-500 mb-1 block">头像</label>
+            <div class="flex items-center gap-3 mb-2">
+                <img id="edit-avatar-preview" src="" class="w-10 h-10 rounded-full object-cover border shrink-0 bg-gray-100">
+                <input type="file" id="edit-avatar-file" accept="image/*" class="w-full text-xs text-gray-500 file:mr-2 file:py-1 file:px-2 file:rounded-lg file:border-0 file:text-xs file:font-medium file:bg-indigo-50 file:text-indigo-600 file:cursor-pointer">
+            </div>
+            <p class="text-xs text-gray-400">支持 JPG/PNG，留空使用默认头像</p>
+        </div>
+        <div class="flex justify-end space-x-2">
+            <button onclick="closeEditUser()" class="text-xs text-gray-400 px-4 py-2 rounded-xl hover:bg-gray-50">取消</button>
+            <button onclick="submitEditUser()" class="text-xs bg-indigo-600 text-white px-4 py-2 rounded-xl hover:bg-indigo-700">保存</button>
+        </div>
+    </div>
+</div>
+
+<!-- 修改密码弹窗 -->
+<div id="reset-pw-modal" class="fixed inset-0 bg-black/40 z-50 hidden flex items-center justify-center">
+    <div class="bg-white rounded-2xl p-6 w-80 shadow-xl">
+        <h3 class="text-sm font-bold text-gray-700 mb-1">修改密码</h3>
+        <p class="text-xs text-gray-400 mb-4">用户：<span id="reset-pw-username" class="text-indigo-500 font-medium"></span></p>
+        <input type="password" id="reset-pw-input" placeholder="输入新密码" class="w-full border border-gray-200 rounded-xl px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-indigo-200 focus:border-indigo-400 mb-4">
+        <div class="flex justify-end space-x-2">
+            <button onclick="closeResetPw()" class="text-xs text-gray-400 px-4 py-2 rounded-xl hover:bg-gray-50">取消</button>
+            <button onclick="submitResetPw()" class="text-xs bg-indigo-600 text-white px-4 py-2 rounded-xl hover:bg-indigo-700">确认修改</button>
+        </div>
+    </div>
+</div>
+<script>
+function showEditUser(id, username, role, avatarUrl) {
+    document.getElementById('edit-user-id').value = id;
+    document.getElementById('edit-username').value = username;
+    document.getElementById('edit-role').value = role;
+    document.getElementById('edit-avatar-file').value = '';
+    document.getElementById('edit-avatar-preview').src = avatarUrl || 'https://api.dicebear.com/7.x/adventurer/svg?seed=' + encodeURIComponent(username);
+    document.getElementById('edit-user-modal').classList.remove('hidden');
+}
+function closeEditUser() {
+    document.getElementById('edit-user-modal').classList.add('hidden');
+}
+function submitEditUser() {
+    var id = document.getElementById('edit-user-id').value;
+    var username = document.getElementById('edit-username').value.trim();
+    var role = document.getElementById('edit-role').value;
+    if (!username) { alert('用户名不能为空'); return; }
+    var fd = new FormData();
+    fd.append('username', username);
+    fd.append('role', role);
+    var file = document.getElementById('edit-avatar-file').files[0];
+    if (file) fd.append('avatar_file', file);
+    fetch('/admin/users/update/' + id, { method: 'POST', body: fd })
+    .then(r => r.json()).then(d => {
+        if (d.ok) { closeEditUser(); showToast('用户信息已更新'); setTimeout(function(){ location.reload(); }, 800); }
+        else { alert(d.msg || '更新失败'); }
+    });
+}
+
+var _resetPwId = 0;
+function showResetPw(id, username) {
+    _resetPwId = id;
+    document.getElementById('reset-pw-username').textContent = username;
+    document.getElementById('reset-pw-input').value = '';
+    document.getElementById('reset-pw-modal').classList.remove('hidden');
+}
+function closeResetPw() {
+    document.getElementById('reset-pw-modal').classList.add('hidden');
+}
+function submitResetPw() {
+    var pw = document.getElementById('reset-pw-input').value;
+    if (!pw) { alert('请输入新密码'); return; }
+    fetch('/admin/users/reset-password/' + _resetPwId, {
+        method: 'POST',
+        headers: {'Content-Type': 'application/x-www-form-urlencoded'},
+        body: 'password=' + encodeURIComponent(pw)
+    }).then(r => r.json()).then(d => {
+        if (d.ok) { closeResetPw(); showToast('密码修改成功'); }
+        else { alert(d.msg || '修改失败'); }
+    });
+}
+</script>

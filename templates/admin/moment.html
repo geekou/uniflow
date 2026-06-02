@@ -1,0 +1,183 @@
+{{template "admin_head" .}}
+
+{{if eq .Mode "list"}}
+    <div class="flex items-center justify-between mb-6">
+        <h2 class="text-lg font-bold">瞬间列表 <span class="text-sm text-gray-400 font-normal ml-1">(共 {{len .Moments}} 条)</span></h2>
+        <a href="/admin/moments/create" class="bg-indigo-600 text-white text-xs px-4 py-2 rounded-xl font-medium hover:bg-indigo-700 transition shadow-xs shadow-indigo-100"><i class="fa-solid fa-plus mr-1"></i>发布瞬间</a>
+    </div>
+
+    <div class="space-y-3">
+        {{range .Moments}}
+        <div class="bg-white rounded-2xl p-5 shadow-xs border border-gray-100/50 flex items-start justify-between gap-4">
+            <div class="flex-1 min-w-0">
+                <p class="text-sm text-gray-700 line-clamp-2 mb-2">{{.Content}}</p>
+                {{if .MediaURLs}}<div class="flex space-x-1 mt-1">{{range $i, $url := .MediaList}}{{if lt $i 4}}{{if isVideo $url}}<video src="{{$url}}" class="w-12 h-12 rounded-lg object-contain" preload="metadata"></video>{{else}}<img src="{{$url}}" class="w-12 h-12 rounded-lg object-cover">{{end}}{{end}}{{end}}{{if gt (len .MediaList) 4}}<span class="w-12 h-12 rounded-lg bg-gray-100 flex items-center justify-center text-[10px] text-gray-400">+{{sub (len .MediaList) 4}}</span>{{end}}</div>{{end}}
+                <div class="flex items-center space-x-4 mt-2 text-[11px] text-gray-400">
+                    <span><i class="fa-regular fa-calendar mr-1"></i>{{formatTime .CreatedAt}}</span>
+                    <span><i class="fa-solid fa-heart text-red-300 mr-1"></i>{{.Likes}}</span>
+                </div>
+            </div>
+            <div class="flex items-center space-x-2 shrink-0">
+                <a href="/admin/moments/edit/{{.ID}}" class="text-xs text-indigo-500 hover:text-indigo-700"><i class="fa-solid fa-pen-to-square"></i></a>
+                <button onclick="confirmAction('确定删除此瞬间？', '/admin/moments/delete/{{.ID}}')" class="text-xs text-red-400 hover:text-red-600"><i class="fa-solid fa-trash"></i></button>
+            </div>
+        </div>
+        {{end}}
+        {{if eq (len .Moments) 0}}<div class="bg-white rounded-2xl p-12 shadow-xs border border-gray-100/50 text-center text-sm text-gray-400">暂无瞬间</div>{{end}}
+    </div>
+
+{{else}}
+    <div class="flex items-center justify-between mb-6">
+        <h2 class="text-lg font-bold">{{if eq .Mode "create"}}发布瞬间{{else}}编辑瞬间{{end}}</h2>
+        <a href="/admin/moments" class="text-xs text-gray-400 hover:text-indigo-600 transition"><i class="fa-solid fa-arrow-left mr-1"></i>返回列表</a>
+    </div>
+
+    <form method="POST" id="moment-form" data-no-toast action="{{if eq .Mode "create"}}/admin/moments/create{{else}}/admin/moments/edit/{{.Moment.ID}}{{end}}" enctype="multipart/form-data" class="space-y-4">
+        <div class="bg-white rounded-2xl p-6 shadow-xs border border-gray-100/50 space-y-4">
+            <div>
+                <label class="text-xs font-medium text-gray-500 mb-1 block">瞬间内容</label>
+                <textarea name="content" rows="4" required placeholder="此刻的想法..." class="w-full border border-gray-200 rounded-xl px-4 py-2.5 text-sm outline-none focus:ring-2 focus:ring-indigo-200 focus:border-indigo-400 resize-none">{{.Moment.Content}}</textarea>
+            </div>
+            <div>
+                <label class="text-xs font-medium text-gray-500 mb-1 block">发布时间</label>
+                <input type="datetime-local" name="created_at" {{if gt (.Moment.CreatedAt.Year) 1}}value="{{formatDatetimeLocal .Moment.CreatedAt}}"{{end}} class="w-full border border-gray-200 rounded-xl px-4 py-2.5 text-sm outline-none focus:ring-2 focus:ring-indigo-200 focus:border-indigo-400">
+                <p class="text-[10px] text-gray-400 mt-1">留空则使用当前时间</p>
+            </div>
+            <div>
+                <label class="text-xs font-medium text-gray-500 mb-1 block">上传图片/视频（支持多选）</label>
+                <input type="file" name="media" id="moment-media-input" multiple accept="image/*,video/*" onchange="previewMomentMedia(this)" class="text-xs text-gray-500 file:mr-2 file:py-1.5 file:px-3 file:rounded-lg file:border-0 file:bg-indigo-50 file:text-indigo-600 file:text-xs file:font-medium file:cursor-pointer">
+                <div id="moment-media-preview" class="flex flex-wrap gap-2 mt-3"></div>
+                {{if .Moment.MediaURLs}}
+                <div class="flex flex-wrap gap-2 mt-3" id="existing-media">
+                    {{range $url := split .Moment.MediaURLs ","}}
+                    <div class="relative w-20 h-20 rounded-lg overflow-hidden bg-gray-100">
+                        {{if isVideo $url}}
+                        <video src="{{$url}}" class="w-full h-full object-contain" preload="metadata"></video>
+                        {{else}}
+                        <img src="{{$url}}" class="w-full h-full object-cover">
+                        {{end}}
+                    </div>
+                    {{end}}
+                </div>
+                {{end}}
+            </div>
+        </div>
+        <div class="flex justify-end">
+            <button type="submit" class="bg-indigo-600 text-white text-sm px-6 py-2.5 rounded-xl font-medium hover:bg-indigo-700 transition shadow-xs shadow-indigo-100">
+                <i class="fa-solid fa-paper-plane mr-1"></i> 提交
+            </button>
+        </div>
+    </form>
+    <script>
+        var momentMediaFiles = [];
+
+        // 页面加载时：把已存在的预览文件同步到 momentMediaFiles
+        // （编辑模式下现有图片不需要加入，仅新增的才需要走这里）
+
+        function previewMomentMedia(input) {
+            var preview = document.getElementById('moment-media-preview');
+            var existing = document.getElementById('existing-media');
+            if (existing) existing.style.display = 'none';
+            for (var i = 0; i < input.files.length; i++) {
+                if (momentMediaFiles.indexOf(input.files[i]) === -1) {
+                    momentMediaFiles.push(input.files[i]);
+                }
+            }
+            renderPreviews();
+            // 重置 input，这样同文件再次选择时仍能触发 onchange
+            input.value = '';
+        }
+
+        function renderPreviews() {
+            var preview = document.getElementById('moment-media-preview');
+            preview.innerHTML = '';
+            for (var i = 0; i < momentMediaFiles.length; i++) {
+                (function(file, idx) {
+                    var div = document.createElement('div');
+                    div.className = 'relative w-20 h-20 rounded-lg overflow-hidden bg-gray-100';
+                    if (file.type.startsWith('video/')) {
+                        var video = document.createElement('video');
+                        video.src = URL.createObjectURL(file);
+                        video.className = 'w-full h-full object-contain';
+                        video.preload = 'metadata';
+                        div.appendChild(video);
+                        var btn = document.createElement('button');
+                        btn.type = 'button';
+                        btn.className = 'absolute top-1 right-1 w-5 h-5 bg-red-500 text-white rounded-full text-[10px] flex items-center justify-center';
+                        btn.innerHTML = '\u00d7';
+                        btn.onclick = function() { removePreview(idx); };
+                        div.appendChild(btn);
+                        preview.appendChild(div);
+                    } else {
+                        var reader = new FileReader();
+                        reader.onload = function(e) {
+                            div.innerHTML = '<img src="'+e.target.result+'" class="w-full h-full object-cover"><button type="button" onclick="removePreview('+idx+')" class="absolute top-1 right-1 w-5 h-5 bg-red-500 text-white rounded-full text-[10px] flex items-center justify-center">\u00d7</button>';
+                            preview.appendChild(div);
+                        };
+                        reader.readAsDataURL(file);
+                    }
+                })(momentMediaFiles[i], i);
+            }
+        }
+
+        function removePreview(idx) {
+            momentMediaFiles.splice(idx, 1);
+            renderPreviews();
+        }
+
+        // 拦截表单提交：用 FormData 手工附加所有 momentMediaFiles，避免 input.files 只读导致丢文件
+        (function() {
+            var form = document.getElementById('moment-form');
+            if (!form) return;
+            form.addEventListener('submit', function(e) {
+                e.preventDefault();
+                var fd = new FormData(form);
+                // 清空默认的 media 字段（可能只含最后一次选择的文件）
+                fd.delete('media');
+                // 逐个添加所有选中文件，形成多个 "media" 字段
+                for (var i = 0; i < momentMediaFiles.length; i++) {
+                    fd.append('media', momentMediaFiles[i]);
+                }
+                var method = form.method.toUpperCase();
+                var action = form.action;
+                var btn = form.querySelector('button[type=submit]');
+                var originalText = btn ? btn.innerHTML : '';
+                if (btn) {
+                    btn.disabled = true;
+                    btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin mr-1"></i> 提交中...';
+                }
+                fetch(action, { method: method, body: fd, credentials: 'same-origin' })
+                    .then(function(res) {
+                        if (res.redirected || res.status === 302 || res.status === 200) {
+                            var isEdit = action.includes('/edit/');
+                            showToast(isEdit ? '瞬间已更新' : '瞬间已发布', 'success');
+                            setTimeout(function() { window.location.href = res.url || '/admin/moments'; }, 600);
+                        } else {
+                            showToast('提交失败', 'error');
+                            if (btn) { btn.disabled = false; btn.innerHTML = originalText; }
+                        }
+                    })
+                    .catch(function() {
+                        showToast('请求失败', 'error');
+                        if (btn) { btn.disabled = false; btn.innerHTML = originalText; }
+                    });
+            });
+        })();
+
+        // 创建模式下默认填充当天时间
+        (function() {
+            var input = document.querySelector('input[name="created_at"]');
+            if (input && !input.value) {
+                var now = new Date();
+                var y = now.getFullYear();
+                var m = String(now.getMonth()+1).padStart(2,'0');
+                var d = String(now.getDate()).padStart(2,'0');
+                var h = String(now.getHours()).padStart(2,'0');
+                var min = String(now.getMinutes()).padStart(2,'0');
+                input.value = y+'-'+m+'-'+d+'T'+h+':'+min;
+            }
+        })();
+    </script>
+{{end}}
+
+{{template "admin_tail" .}}

@@ -1,0 +1,63 @@
+{{template "admin_head" .}}
+
+{{if eq .Mode "list"}}
+    <div class="flex items-center justify-between mb-6">
+        <h2 class="text-lg font-bold">页面管理</h2>
+        <a href="/admin/pages/create" class="bg-indigo-600 text-white text-xs px-4 py-2 rounded-xl font-medium hover:bg-indigo-700 transition shadow-xs shadow-indigo-100"><i class="fa-solid fa-plus mr-1"></i>新建页面</a>
+    </div>
+
+    <div class="bg-white rounded-2xl shadow-xs border border-gray-100/50 overflow-hidden">
+        <table class="w-full text-sm">
+            <thead class="bg-gray-50/50 text-xs text-gray-400">
+                <tr><th class="text-left px-5 py-3">ID</th><th class="text-left px-5 py-3">标题</th><th class="text-left px-5 py-3">Slug</th><th class="text-left px-5 py-3">创建时间</th><th class="text-left px-5 py-3">操作</th></tr>
+            </thead>
+            <tbody class="divide-y divide-gray-50">
+                {{range .Pages}}
+                <tr class="hover:bg-gray-50/50 transition">
+                    <td class="px-5 py-3 text-xs text-gray-400">{{.ID}}</td>
+                    <td class="px-5 py-3 font-medium text-gray-700">{{.Title}}</td>
+                    <td class="px-5 py-3 text-xs text-gray-500"><a href="/page/{{.Slug}}" target="_blank" class="text-indigo-500 hover:underline">{{.Slug}}</a></td>
+                    <td class="px-5 py-3 text-xs text-gray-400">{{formatDate .CreatedAt}}</td>
+                    <td class="px-5 py-3">
+                        <div class="flex items-center space-x-2">
+                            <a href="/admin/pages/edit/{{.ID}}" class="text-xs text-indigo-500 hover:text-indigo-700"><i class="fa-solid fa-pen-to-square"></i></a>
+                            <button onclick="confirmAction('确定删除此页面？', '/admin/pages/delete/{{.ID}}')" class="text-xs text-red-400 hover:text-red-600"><i class="fa-solid fa-trash"></i></button>
+                        </div>
+                    </td>
+                </tr>
+                {{end}}
+            </tbody>
+        </table>
+        {{if eq (len .Pages) 0}}<div class="text-center py-12 text-sm text-gray-400">暂无页面</div>{{end}}
+    </div>
+
+{{else}}
+    <div class="flex items-center justify-between mb-6">
+        <h2 class="text-lg font-bold">{{if eq .Mode "create"}}新建页面{{else}}编辑页面{{end}}</h2>
+        <a href="/admin/pages" class="text-xs text-gray-400 hover:text-indigo-600 transition"><i class="fa-solid fa-arrow-left mr-1"></i>返回列表</a>
+    </div>
+
+    <form method="POST" action="{{if eq .Mode "create"}}/admin/pages/create{{else}}/admin/pages/edit/{{.Page.ID}}{{end}}" class="space-y-4">
+        <div class="bg-white rounded-2xl p-6 shadow-xs border border-gray-100/50 space-y-4">
+            <div class="grid grid-cols-3 gap-4">
+                <div class="col-span-2">
+                    <label class="text-xs font-medium text-gray-500 mb-1 block">页面标题</label>
+                    <input type="text" name="title" value="{{.Page.Title}}" required class="w-full border border-gray-200 rounded-xl px-4 py-2.5 text-sm outline-none focus:ring-2 focus:ring-indigo-200 focus:border-indigo-400">
+                </div>
+                <div>
+                    <label class="text-xs font-medium text-gray-500 mb-1 block">Slug（路由别名）</label>
+                    <input type="text" name="slug" value="{{.Page.Slug}}" required class="w-full border border-gray-200 rounded-xl px-4 py-2.5 text-sm outline-none focus:ring-2 focus:ring-indigo-200 focus:border-indigo-400" placeholder="如：links">
+                </div>
+            </div>
+            <div>
+                <label class="text-xs font-medium text-gray-500 mb-1 block">页面内容（支持 HTML）</label>
+                <textarea name="content" rows="16" class="w-full border border-gray-200 rounded-xl px-4 py-2.5 text-sm outline-none focus:ring-2 focus:ring-indigo-200 focus:border-indigo-400 font-mono resize-y">{{.Page.Content}}</textarea>
+            </div>
+        </div>
+        <div class="flex justify-end">
+            <button type="submit" class="bg-indigo-600 text-white text-sm px-6 py-2.5 rounded-xl font-medium hover:bg-indigo-700 transition shadow-xs shadow-indigo-100">保存页面</button>
+        </div>
+    </form>
+{{end}}
+
+{{template "admin_tail" .}}

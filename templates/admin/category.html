@@ -1,0 +1,43 @@
+{{template "admin_head" .}}
+    <div class="flex items-center justify-between mb-6">
+        <h2 class="text-lg font-bold">分类管理</h2>
+    </div>
+
+    <div class="bg-white rounded-2xl p-6 shadow-xs border border-gray-100/50 space-y-6">
+        <!-- Add Category -->
+        <form method="POST" action="/admin/categories/save" class="flex items-end space-x-3">
+            <div class="flex-1">
+                <label class="text-xs font-medium text-gray-500 mb-1 block">分类名称</label>
+                <input type="text" name="name" required placeholder="如：技术" class="w-full border border-gray-200 rounded-xl px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-indigo-200 focus:border-indigo-400">
+            </div>
+            <div class="flex-1">
+                <label class="text-xs font-medium text-gray-500 mb-1 block">Slug（别名）</label>
+                <input type="text" name="slug" required placeholder="如：tech" class="w-full border border-gray-200 rounded-xl px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-indigo-200 focus:border-indigo-400">
+            </div>
+            <button type="submit" class="bg-indigo-600 text-white text-xs px-5 py-2 rounded-xl font-medium hover:bg-indigo-700 transition">添加</button>
+        </form>
+
+        <!-- Category List -->
+        <table class="w-full text-sm">
+            <thead class="bg-gray-50/50 text-xs text-gray-400">
+                <tr><th class="text-left px-4 py-3">ID</th><th class="text-left px-4 py-3">名称</th><th class="text-left px-4 py-3">Slug</th><th class="text-left px-4 py-3">文章数</th><th class="text-left px-4 py-3">操作</th></tr>
+            </thead>
+            <tbody class="divide-y divide-gray-50">
+                {{range .Categories}}
+                <tr class="hover:bg-gray-50/50 transition">
+                    <td class="px-4 py-3 text-xs text-gray-400">{{.ID}}</td>
+                    <td class="px-4 py-3 font-medium text-gray-700">{{.Name}}</td>
+                    <td class="px-4 py-3 text-xs text-gray-500">{{.Slug}}</td>
+                    <td class="px-4 py-3 text-xs text-gray-400">{{.PostCount}}</td>
+                    <td class="px-4 py-3">
+                        <div class="flex items-center space-x-2">
+                            <button onclick="confirmAction('确定删除此分类？', '/admin/categories/delete/{{.ID}}')" class="text-xs text-red-400 hover:text-red-600"><i class="fa-solid fa-trash"></i></button>
+                        </div>
+                    </td>
+                </tr>
+                {{end}}
+            </tbody>
+        </table>
+        {{if eq (len .Categories) 0}}<div class="text-center py-8 text-sm text-gray-400">暂无分类</div>{{end}}
+    </div>
+{{template "admin_tail" .}}

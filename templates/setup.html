@@ -1,0 +1,48 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>初始化 - UniFlow</title>
+    <script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4"></script>
+    <style>
+        body { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); min-height: 100vh; }
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+        .fade-in { animation: fadeIn 0.5s ease; }
+    </style>
+</head>
+<body class="flex items-center justify-center p-4">
+    <div class="fade-in bg-white rounded-3xl shadow-2xl p-8 w-full max-w-md">
+        <div class="text-center mb-6">
+            <div class="w-14 h-14 bg-indigo-600 rounded-2xl flex items-center justify-center text-white font-bold text-2xl mx-auto mb-4 shadow-lg shadow-indigo-200">U</div>
+            <h1 class="text-xl font-bold text-gray-900">欢迎使用 UniFlow</h1>
+            <p class="text-sm text-gray-400 mt-1">首次部署，请完成基础配置</p>
+            {{if .Error}}<p class="text-sm text-red-500 mt-2">{{.Error}}</p>{{end}}
+        </div>
+        <form method="POST" class="space-y-4">
+            <div>
+                <label class="text-xs font-medium text-gray-500 mb-1 block">站点名称</label>
+                <input type="text" name="site_title" value="UniFlow" required class="w-full border border-gray-200 rounded-xl px-4 py-2.5 text-sm outline-none focus:ring-2 focus:ring-indigo-200 focus:border-indigo-400">
+            </div>
+            <div>
+                <label class="text-xs font-medium text-gray-500 mb-1 block">你的昵称</label>
+                <input type="text" name="nickname" required placeholder="用于关于我展示" class="w-full border border-gray-200 rounded-xl px-4 py-2.5 text-sm outline-none focus:ring-2 focus:ring-indigo-200 focus:border-indigo-400">
+            </div>
+            <div class="border-t border-gray-100 pt-4">
+                <p class="text-xs text-gray-400 mb-3">管理员账号</p>
+            </div>
+            <div>
+                <label class="text-xs font-medium text-gray-500 mb-1 block">用户名</label>
+                <input type="text" name="username" required placeholder="用于登录后台" class="w-full border border-gray-200 rounded-xl px-4 py-2.5 text-sm outline-none focus:ring-2 focus:ring-indigo-200 focus:border-indigo-400">
+            </div>
+            <div>
+                <label class="text-xs font-medium text-gray-500 mb-1 block">密码</label>
+                <input type="password" name="password" required minlength="6" placeholder="至少6位" class="w-full border border-gray-200 rounded-xl px-4 py-2.5 text-sm outline-none focus:ring-2 focus:ring-indigo-200 focus:border-indigo-400">
+            </div>
+            <button type="submit" class="w-full bg-indigo-600 text-white text-sm font-medium py-2.5 rounded-xl hover:bg-indigo-700 active:scale-[0.98] transition shadow-lg shadow-indigo-200">
+                完成初始化，开始使用
+            </button>
+        </form>
+    </div>
+</body>
+</html>

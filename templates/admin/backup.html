@@ -1,0 +1,66 @@
+{{template "admin_head" .}}
+<script>
+function createBackup() {
+    var btn = document.getElementById('btn-backup');
+    btn.disabled = true;
+    btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin mr-1"></i>备份中...';
+    fetch('/admin/backup/create', {method: 'POST', headers: {'X-Requested-With': 'fetch'}})
+        .then(function(r) { return r.json(); })
+        .then(function(data) {
+            if (data.ok) {
+                showToast('备份成功', 'success');
+                setTimeout(function() { location.reload(); }, 800);
+            } else {
+                showToast(data.msg || '备份失败', 'error');
+            }
+        })
+        .catch(function() { showToast('请求失败', 'error'); })
+        .finally(function() {
+            btn.disabled = false;
+            btn.innerHTML = '<i class="fa-solid fa-download mr-1"></i>立即备份';
+        });
+}
+</script>
+    <div class="flex items-center justify-between mb-6">
+        <h2 class="text-lg font-bold">备份恢复</h2>
+    </div>
+
+    <!-- Create Backup -->
+    <div class="bg-white rounded-2xl p-6 shadow-xs border border-gray-100/50 mb-6">
+        <div class="flex items-center justify-between">
+            <div>
+                <h3 class="text-sm font-bold text-gray-700">创建备份</h3>
+                <p class="text-xs text-gray-400 mt-1">将数据库和上传文件打包为 .tar.gz 压缩包</p>
+            </div>
+            <button onclick="createBackup()" id="btn-backup" class="bg-indigo-600 text-white text-xs px-5 py-2.5 rounded-xl font-medium hover:bg-indigo-700 transition shadow-xs shadow-indigo-100"><i class="fa-solid fa-download mr-1"></i>立即备份</button>
+        </div>
+    </div>
+
+    <!-- Backup List -->
+    <div class="bg-white rounded-2xl shadow-xs border border-gray-100/50 overflow-hidden">
+        <div class="p-4 border-b border-gray-50">
+            <h3 class="text-sm font-bold text-gray-500">备份列表</h3>
+        </div>
+        <table class="w-full text-sm">
+            <thead class="bg-gray-50/50 text-xs text-gray-400">
+                <tr><th class="text-left px-5 py-3">文件名</th><th class="text-left px-5 py-3">大小</th><th class="text-left px-5 py-3">操作</th></tr>
+            </thead>
+            <tbody class="divide-y divide-gray-50">
+                {{range .Backups}}
+                <tr class="hover:bg-gray-50/50 transition">
+                    <td class="px-5 py-3 text-xs font-medium text-gray-700"><i class="fa-solid fa-file-zipper text-indigo-400 mr-2"></i>{{.Name}}</td>
+                    <td class="px-5 py-3 text-xs text-gray-400">{{.Size}}</td>
+                    <td class="px-5 py-3">
+                        <div class="flex items-center space-x-3">
+                            <a href="/admin/backup/download/{{.Name}}" class="text-xs text-blue-500 hover:text-blue-700"><i class="fa-solid fa-download mr-1"></i>下载</a>
+                            <button onclick="confirmAction('确定从此备份恢复？当前数据库和上传文件将被覆盖，恢复后服务将自动重启。', '/admin/backup/restore/{{.Name}}')" class="text-xs text-amber-500 hover:text-amber-700"><i class="fa-solid fa-rotate-left mr-1"></i>恢复</button>
+                            <button onclick="confirmAction('确定删除此备份文件？', '/admin/backup/delete/{{.Name}}')" class="text-xs text-red-400 hover:text-red-600"><i class="fa-solid fa-trash mr-1"></i>删除</button>
+                        </div>
+                    </td>
+                </tr>
+                {{end}}
+            </tbody>
+        </table>
+        {{if eq (len .Backups) 0}}<div class="text-center py-12 text-sm text-gray-400">暂无备份</div>{{end}}
+    </div>
+{{template "admin_tail" .}}

@@ -1,0 +1,321 @@
+{{define "extra_head"}}
+<link href="https://cdn.quilljs.com/1.3.7/quill.snow.css" rel="stylesheet">
+<script src="https://cdn.quilljs.com/1.3.7/quill.js"></script>
+{{end}}
+
+{{template "admin_head" .}}
+
+{{if eq .Mode "list"}}
+    <div class="flex items-center justify-between mb-6">
+        <h2 class="text-lg font-bold">文章列表</h2>
+        <a href="/admin/posts/create" class="bg-indigo-600 text-white text-xs px-4 py-2 rounded-xl font-medium hover:bg-indigo-700 transition shadow-xs shadow-indigo-100"><i class="fa-solid fa-plus mr-1"></i>发布文章</a>
+    </div>
+
+    <div class="bg-white rounded-2xl shadow-xs border border-gray-100/50 overflow-hidden">
+        <!-- Search -->
+        <div class="p-4 border-b border-gray-50 flex items-center space-x-3">
+            <form method="GET" action="/admin/posts" class="flex items-center flex-1 bg-gray-50 px-3 py-2 rounded-xl border border-gray-100">
+                <i class="fa-solid fa-magnifying-glass text-gray-400 text-xs mr-2"></i>
+                <input type="text" name="q" placeholder="搜索文章标题..." value="{{.SearchQuery}}" class="bg-transparent text-sm flex-1 outline-none placeholder-gray-400">
+            </form>
+            <select onchange="location.href='/admin/posts?status='+this.value" class="border border-gray-200 rounded-xl px-3 py-2 text-xs outline-none">
+                <option value="">全部状态</option>
+                <option value="published" {{if eq .FilterStatus "published"}}selected{{end}}>已发布</option>
+                <option value="draft" {{if eq .FilterStatus "draft"}}selected{{end}}>草稿</option>
+                <option value="scheduled" {{if eq .FilterStatus "scheduled"}}selected{{end}}>定时</option>
+            </select>
+        </div>
+        <!-- Table -->
+        <div class="overflow-x-auto">
+            <table class="w-full text-sm">
+                <thead class="bg-gray-50/50 text-xs text-gray-400">
+                    <tr><th class="text-left px-5 py-3">ID</th><th class="text-left px-5 py-3">标题</th><th class="text-left px-5 py-3">分类</th><th class="text-left px-5 py-3">状态</th><th class="text-left px-5 py-3">浏览</th><th class="text-left px-5 py-3">创建时间</th><th class="text-left px-5 py-3">操作</th></tr>
+                </thead>
+                <tbody class="divide-y divide-gray-50">
+                    {{range .Posts}}
+                    <tr class="hover:bg-gray-50/50 transition">
+                        <td class="px-5 py-3 text-xs text-gray-400">{{.ID}}</td>
+                        <td class="px-5 py-3 font-medium text-gray-700 max-w-[200px] line-clamp-1">{{.Title}}</td>
+                        <td class="px-5 py-3 text-xs text-gray-500">{{if .CategoryName}}{{.CategoryName}}{{else}}<span class="text-gray-300">-</span>{{end}}</td>
+                        <td class="px-5 py-3">
+                            {{if eq .Status "published"}}<span class="text-[10px] bg-green-50 text-green-600 px-2 py-0.5 rounded-full font-medium">已发布</span>
+                            {{else if eq .Status "draft"}}<span class="text-[10px] bg-gray-100 text-gray-500 px-2 py-0.5 rounded-full font-medium">草稿</span>
+                            {{else}}<span class="text-[10px] bg-amber-50 text-amber-600 px-2 py-0.5 rounded-full font-medium">定时</span>{{end}}
+                        </td>
+                        <td class="px-5 py-3 text-xs text-gray-400">{{.Views}}</td>
+                        <td class="px-5 py-3 text-xs text-gray-400">{{formatTime .CreatedAt}}</td>
+                        <td class="px-5 py-3">
+                            <div class="flex items-center space-x-2">
+                                <a href="/admin/posts/edit/{{.ID}}" class="text-xs text-indigo-500 hover:text-indigo-700"><i class="fa-solid fa-pen-to-square"></i></a>
+                                <a href="/admin/posts/export/{{.ID}}" class="text-xs text-emerald-500 hover:text-emerald-700" title="导出 Markdown"><i class="fa-solid fa-file-arrow-down"></i></a>
+                                <button onclick="confirmAction('确定删除这篇文章吗？', '/admin/posts/delete/{{.ID}}')" class="text-xs text-red-400 hover:text-red-600"><i class="fa-solid fa-trash"></i></button>
+                            </div>
+                        </td>
+                    </tr>
+                    {{end}}
+                </tbody>
+            </table>
+        </div>
+        {{if eq (len .Posts) 0}}<div class="text-center py-12 text-sm text-gray-400">暂无文章</div>{{end}}
+    </div>
+
+{{else}}
+    <!-- Form mode: create or edit -->
+    <div class="flex items-center justify-between mb-6">
+        <h2 class="text-lg font-bold">{{if eq .Mode "create"}}发布文章{{else}}编辑文章{{end}}</h2>
+        <a href="/admin/posts" class="text-xs text-gray-400 hover:text-indigo-600 transition"><i class="fa-solid fa-arrow-left mr-1"></i>返回列表</a>
+    </div>
+
+    <form id="post-form" method="POST" data-no-toast enctype="multipart/form-data" action="{{if eq .Mode "create"}}/admin/posts/create{{else}}/admin/posts/edit/{{.Post.ID}}{{end}}" class="space-y-4">
+        <input type="hidden" name="content" id="hidden-content">
+        <input type="hidden" name="status" value="{{if eq .Mode "create"}}published{{else}}{{.Post.Status}}{{end}}">
+        <div class="bg-white rounded-2xl p-6 shadow-xs border border-gray-100/50 space-y-4">
+            <div>
+                <label class="text-xs font-medium text-gray-500 mb-1 block">文章标题</label>
+                <input type="text" name="title" value="{{.Post.Title}}" required placeholder="请输入文章标题" class="w-full border border-gray-200 rounded-xl px-4 py-2.5 text-sm outline-none focus:ring-2 focus:ring-indigo-200 focus:border-indigo-400">
+            </div>
+            <div>
+                <label class="text-xs font-medium text-gray-500 mb-1 block">文章内容</label>
+                <div id="editor" style="height: 400px;"></div>
+            </div>
+            <!-- Quick settings inline -->
+            <div class="grid grid-cols-3 gap-4 pt-3 border-t border-gray-50">
+                <div>
+                    <label class="text-xs font-medium text-gray-500 mb-1 block">分类</label>
+                    <select name="category_id" class="w-full border border-gray-200 rounded-xl px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-indigo-200 focus:border-indigo-400">
+                        <option value="">请选择分类</option>
+                        {{range .Categories}}
+                        <option value="{{.ID}}" {{if .Selected}}selected{{end}}>{{.Name}}</option>
+                        {{end}}
+                    </select>
+                </div>
+                <div>
+                    <label class="text-xs font-medium text-gray-500 mb-1 block">权限</label>
+                    <select name="privacy" class="w-full border border-gray-200 rounded-xl px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-indigo-200 focus:border-indigo-400">
+                        <option value="public" {{if eq .Privacy "public"}}selected{{end}}>公开</option>
+                        <option value="private" {{if eq .Privacy "private"}}selected{{end}}>私密</option>
+                    </select>
+                </div>
+                <div>
+                    <label class="text-xs font-medium text-gray-500 mb-1 block">定时发布</label>
+                    <input type="datetime-local" name="publish_at" value="{{.PublishAt}}" class="w-full border border-gray-200 rounded-xl px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-indigo-200 focus:border-indigo-400">
+                </div>
+            </div>
+            <!-- Tags -->
+            <div>
+                <label class="text-xs font-medium text-gray-500 mb-2 block">标签</label>
+                <div class="flex flex-wrap gap-2">
+                    {{range .Tags}}
+                    <label class="flex items-center space-x-1.5 text-xs bg-gray-50 px-3 py-1.5 rounded-lg cursor-pointer hover:bg-indigo-50 transition">
+                        <input type="checkbox" name="tags" value="{{.ID}}" class="accent-indigo-600" {{if .Selected}}checked{{end}}>
+                        <span>{{.Name}}</span>
+                    </label>
+                    {{end}}
+                </div>
+            </div>
+            <!-- Cover + Is Top -->
+            <div class="flex items-end gap-4">
+                <div class="flex-1">
+                    <label class="text-xs font-medium text-gray-500 mb-1 block">封面图</label>
+                    <input type="file" name="cover" accept="image/*" onchange="previewCover(this)" class="text-xs text-gray-500 file:mr-2 file:py-1.5 file:px-3 file:rounded-lg file:border-0 file:bg-indigo-50 file:text-indigo-600 file:text-xs file:font-medium file:cursor-pointer">
+                    <div id="cover-preview" class="mt-2 hidden"><img id="cover-img" class="w-40 h-24 object-cover rounded-xl border"></div>
+                    {{if .PostCover}}<div class="mt-2"><img src="{{.PostCover}}" class="w-40 h-24 object-cover rounded-xl border" id="existing-cover"></div>{{end}}
+                </div>
+                <div class="flex items-center space-x-2 pb-2">
+                    <label class="relative inline-flex items-center cursor-pointer">
+                        <input type="checkbox" name="is_top" value="1" class="sr-only peer" {{if .IsTop}}checked{{end}}>
+                        <div class="w-9 h-5 bg-gray-200 peer-focus:ring-2 peer-focus:ring-indigo-200 rounded-full peer peer-checked:after:translate-x-full after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-indigo-600"></div>
+                    </label>
+                    <span class="text-xs text-gray-500">置顶</span>
+                </div>
+            </div>
+        </div>
+        <div class="flex justify-end">
+            <button type="submit" onclick="syncContent()" class="bg-indigo-600 text-white text-sm px-6 py-2.5 rounded-xl font-medium hover:bg-indigo-700 transition shadow-xs shadow-indigo-100">
+                <i class="fa-solid fa-paper-plane mr-1"></i> {{if eq .Mode "create"}}发布文章{{else}}更新文章{{end}}
+            </button>
+        </div>
+    </form>
+
+    <script>
+        // Register custom Video Blot for Quill
+        var BlockEmbed = Quill.import('blots/block/embed');
+        class VideoBlot extends BlockEmbed {
+            static create(url) {
+                var node = super.create();
+                var video = document.createElement('video');
+                video.setAttribute('controls', '');
+                video.setAttribute('src', url);
+                video.setAttribute('style', 'max-width:100%;border-radius:8px;');
+                node.appendChild(video);
+                return node;
+            }
+            static value(domNode) {
+                var video = domNode.querySelector('video');
+                return video ? video.getAttribute('src') : '';
+            }
+        }
+        VideoBlot.blotName = 'video';
+        VideoBlot.className = 'ql-video-upload';
+        VideoBlot.tagName = 'div';
+        Quill.register(VideoBlot, true);
+
+        // Upload helper: post file to /admin/upload, return URL
+        function uploadFile(file, callback) {
+            var fd = new FormData();
+            fd.append('file', file);
+            fetch('/admin/upload', { method: 'POST', body: fd, credentials: 'same-origin' })
+                .then(function(r) { return r.json(); })
+                .then(function(data) {
+                    if (data.url) { callback(data.url); }
+                    else { showToast('上传失败', 'error'); }
+                })
+                .catch(function() { showToast('上传请求失败', 'error'); });
+        }
+
+        var quill = new Quill('#editor', {
+            theme: 'snow',
+            placeholder: '请输入文章内容...',
+            modules: {
+                toolbar: {
+                    container: [
+                        [{ 'header': [1, 2, 3, false] }],
+                        ['bold', 'italic', 'underline', 'strike'],
+                        [{ 'color': [] }, { 'background': [] }],
+                        [{ 'list': 'ordered'}, { 'list': 'bullet' }],
+                        ['blockquote', 'code-block'],
+                        ['link', 'image', 'video'],
+                        ['clean']
+                    ],
+                    handlers: {
+                        image: function() {
+                            var input = document.createElement('input');
+                            input.setAttribute('type', 'file');
+                            input.setAttribute('accept', 'image/*');
+                            input.click();
+                            input.onchange = function() {
+                                var file = input.files[0];
+                                if (!file) return;
+                                var range = quill.getSelection(true);
+                                quill.insertText(range.index, '\n', Quill.sources.USER);
+                                quill.setSelection(range.index + 1, Quill.sources.SILENT);
+                                uploadFile(file, function(url) {
+                                    quill.insertEmbed(range.index + 1, 'image', url, Quill.sources.USER);
+                                    quill.setSelection(range.index + 2, Quill.sources.SILENT);
+                                });
+                            };
+                        },
+                        video: function() {
+                            var input = document.createElement('input');
+                            input.setAttribute('type', 'file');
+                            input.setAttribute('accept', 'video/*');
+                            input.click();
+                            input.onchange = function() {
+                                var file = input.files[0];
+                                if (!file) return;
+                                var range = quill.getSelection(true);
+                                quill.insertText(range.index, '\n', Quill.sources.USER);
+                                quill.setSelection(range.index + 1, Quill.sources.SILENT);
+                                uploadFile(file, function(url) {
+                                    quill.insertEmbed(range.index + 1, 'video', url, Quill.sources.USER);
+                                    quill.setSelection(range.index + 2, Quill.sources.SILENT);
+                                });
+                            };
+                        }
+                    }
+                }
+            }
+        });
+        {{if .PostContentJS}}quill.root.innerHTML = {{.PostContentJS}};{{end}}
+
+        function syncContent() {
+            document.getElementById('hidden-content').value = quill.root.innerHTML;
+        }
+
+        // Intercept form submit for toast
+        document.getElementById('post-form').addEventListener('submit', function(e) {
+            e.preventDefault();
+            syncContent();
+            var form = this;
+            var formData = new FormData(form);
+            // 定时发布逻辑：如果 publish_at 有值且在未来，status 改为 scheduled
+            var publishAt = formData.get('publish_at');
+            if (publishAt) {
+                var scheduledTime = new Date(publishAt);
+                if (scheduledTime > new Date()) {
+                    formData.set('status', 'scheduled');
+                }
+            }
+            var isEdit = form.action.includes('/edit/');
+            fetch(form.action, { method: 'POST', body: formData, headers: {'X-Requested-With': 'fetch'} })
+                .then(function(r) {
+                    if (r.redirected || r.ok) {
+                        showToast(isEdit ? '文章已更新' : '文章已发布', 'success');
+                        setTimeout(function() { window.location.href = '/admin/posts'; }, 600);
+                    } else {
+                        showToast('操作失败', 'error');
+                    }
+                })
+                .catch(function() { showToast('请求失败', 'error'); });
+        });
+
+        function previewCover(input) {
+            if (input.files && input.files[0]) {
+                var reader = new FileReader();
+                reader.onload = function(e) {
+                    var prev = document.getElementById('cover-preview');
+                    var img = document.getElementById('cover-img');
+                    img.src = e.target.result;
+                    prev.classList.remove('hidden');
+                    var existing = document.getElementById('existing-cover');
+                    if (existing) existing.style.display = 'none';
+                };
+                reader.readAsDataURL(input.files[0]);
+            }
+        }
+
+        // ====== 草稿自动保存 ======
+        var _draftKey = 'draft-' + ({{if eq .Mode "create"}}'new'{{else}}{{.Post.ID}}{{end}});
+        var _draftSaved = false;
+        function saveDraft() {
+            var title = document.querySelector('input[name="title"]').value;
+            var html = quill.root.innerHTML;
+            if (!title && !html.trim()) return;
+            var data = { title: title, content: html, time: new Date().toISOString() };
+            localStorage.setItem(_draftKey, JSON.stringify(data));
+            _draftSaved = true;
+        }
+        // 页面加载时检查草稿
+        (function() {
+            var raw = localStorage.getItem(_draftKey);
+            if (!raw) return;
+            try {
+                var draft = JSON.parse(raw);
+                if (confirm('检测到未保存的草稿（' + draft.time.slice(0,16).replace('T',' ') + '），是否恢复？')) {
+                    document.querySelector('input[name="title"]').value = draft.title || '';
+                    quill.clipboard.dangerouslyPasteHTML(draft.content || '');
+                }
+            } catch(e) { localStorage.removeItem(_draftKey); }
+        })();
+        // 每30秒自动保存
+        setInterval(saveDraft, 10000);
+        // 提交成功后清除草稿
+        document.getElementById('post-form').addEventListener('submit', function() {
+            localStorage.removeItem(_draftKey);
+        });
+        // 手动保存提示（Ctrl+S）
+        document.addEventListener('keydown', function(e) {
+            if ((e.ctrlKey || e.metaKey) && e.key === 's') {
+                e.preventDefault();
+                saveDraft();
+                var t = document.createElement('div');
+                t.textContent = '草稿已保存';
+                t.style.cssText = 'position:fixed;bottom:2rem;left:50%;transform:translateX(-50%);background:#10b981;color:#fff;padding:0.5rem 1.5rem;border-radius:2rem;font-size:13px;z-index:9999;opacity:1;transition:opacity 0.5s';
+                document.body.appendChild(t);
+                setTimeout(function(){ t.style.opacity='0'; setTimeout(function(){ t.remove(); }, 500); }, 1500);
+            }
+        });
+    </script>
+{{end}}
+
+{{template "admin_tail" .}}

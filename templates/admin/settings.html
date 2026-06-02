@@ -1,0 +1,137 @@
+{{template "admin_head" .}}
+    <div class="flex items-center justify-between mb-6">
+        <h2 class="text-lg font-bold">网站设置</h2>
+    </div>
+
+    <form method="POST" action="/admin/settings" enctype="multipart/form-data" class="space-y-4">
+        <div class="bg-white rounded-2xl p-6 shadow-xs border border-gray-100/50 space-y-5">
+            <div>
+                <label class="text-xs font-medium text-gray-500 mb-1 block">站点标题</label>
+                <input type="text" name="site_title" value="{{index .Settings "site_title"}}" class="w-full border border-gray-200 rounded-xl px-4 py-2.5 text-sm outline-none focus:ring-2 focus:ring-indigo-200 focus:border-indigo-400">
+            </div>
+            <div>
+                <label class="text-xs font-medium text-gray-500 mb-1 block">站点副标题</label>
+                <input type="text" name="site_subtitle" value="{{index .Settings "site_subtitle"}}" class="w-full border border-gray-200 rounded-xl px-4 py-2.5 text-sm outline-none focus:ring-2 focus:ring-indigo-200 focus:border-indigo-400">
+            </div>
+            <div>
+                <label class="text-xs font-medium text-gray-500 mb-1 block">首页氛围 Banner 图</label>
+                <div class="space-y-2">
+                    <div class="flex items-center gap-3">
+                        <label class="flex-shrink-0 bg-indigo-50 text-indigo-600 text-xs font-medium px-4 py-2 rounded-xl cursor-pointer hover:bg-indigo-100 transition">
+                            <i class="fa-solid fa-cloud-arrow-up mr-1"></i>上传图片
+                            <input type="file" name="banner_file" accept="image/*" class="hidden" onchange="previewBanner(this)">
+                        </label>
+                        <span class="text-[11px] text-gray-400">或填写图片 URL：</span>
+                    </div>
+                    <input type="text" name="banner_url" id="banner_url_input" value="{{index .Settings "banner_url"}}" placeholder="https://example.com/banner.jpg 或 /uploads/xxx.jpg" class="w-full border border-gray-200 rounded-xl px-4 py-2.5 text-sm outline-none focus:ring-2 focus:ring-indigo-200 focus:border-indigo-400">
+                    <div id="banner-preview" class="relative overflow-hidden rounded-xl h-32 bg-gray-50 border border-gray-100">
+                        {{if index .Settings "banner_url"}}
+                        <img src="{{index .Settings "banner_url"}}" class="w-full h-full object-cover" alt="banner preview">
+                        {{else}}
+                        <div class="w-full h-full flex items-center justify-center text-gray-300 text-xs"><i class="fa-regular fa-image text-2xl mr-2"></i>暂未设置 Banner，默认使用置顶文章封面</div>
+                        {{end}}
+                    </div>
+                </div>
+            </div>
+            <div>
+                <label class="text-xs font-medium text-gray-500 mb-1 block">敏感词库（每行一个词）</label>
+                <textarea name="sensitive_words" rows="4" placeholder="每行输入一个敏感词" class="w-full border border-gray-200 rounded-xl px-4 py-2.5 text-sm outline-none focus:ring-2 focus:ring-indigo-200 focus:border-indigo-400 resize-none">{{index .Settings "sensitive_words"}}</textarea>
+            </div>
+            <div class="grid grid-cols-2 gap-4">
+                <div>
+                    <label class="text-xs font-medium text-gray-500 mb-1 block">评论频率限制（次/分钟）</label>
+                    <input type="number" name="comment_limit_count" min="1" value="{{index .Settings "comment_limit_count"}}" class="w-full border border-gray-200 rounded-xl px-4 py-2.5 text-sm outline-none focus:ring-2 focus:ring-indigo-200 focus:border-indigo-400">
+                </div>
+                <div>
+                    <label class="text-xs font-medium text-gray-500 mb-1 block">限制时间窗口（分钟）</label>
+                    <input type="number" name="comment_limit_minute" min="1" value="{{index .Settings "comment_limit_minute"}}" class="w-full border border-gray-200 rounded-xl px-4 py-2.5 text-sm outline-none focus:ring-2 focus:ring-indigo-200 focus:border-indigo-400">
+                </div>
+            </div>
+            <div>
+                <label class="text-xs font-medium text-gray-500 mb-1 block">站点通知</label>
+                <textarea name="site_notification" rows="2" placeholder="输入通知内容，留空则不显示通知图标" class="w-full border border-gray-200 rounded-xl px-4 py-2.5 text-sm outline-none focus:ring-2 focus:ring-indigo-200 focus:border-indigo-400 resize-none">{{index .Settings "site_notification"}}</textarea>
+                <p class="text-[11px] text-gray-400 mt-1">设置后，前台顶部通知图标将显示红点，点击可查看通知内容</p>
+            </div>
+            <div>
+                <label class="text-xs font-medium text-gray-500 mb-1 block">建站时间</label>
+                <input type="datetime-local" name="site_founded_at" value="{{index .Settings "site_founded_at"}}" class="w-full border border-gray-200 rounded-xl px-4 py-2.5 text-sm outline-none focus:ring-2 focus:ring-indigo-200 focus:border-indigo-400">
+                <p class="text-[11px] text-gray-400 mt-1">设置后，前台和后台侧边栏将显示建站运行时长</p>
+            </div>
+        </div>
+
+        <!-- 赞赏收款码 -->
+        <div class="bg-white rounded-2xl p-6 shadow-xs border border-gray-100/50 space-y-5 mt-4">
+            <h3 class="text-sm font-bold text-gray-700"><i class="fa-solid fa-qrcode mr-1.5 text-indigo-500"></i>赞赏收款码</h3>
+            <p class="text-[11px] text-gray-400 -mt-3">上传后，文章详情页将显示赞赏按钮，悬停弹出收款码</p>
+            <div class="grid grid-cols-2 gap-4">
+                <div>
+                    <label class="text-xs font-medium text-gray-500 mb-1 block">微信收款码</label>
+                    <div class="space-y-2">
+                        <label class="inline-flex bg-green-50 text-green-600 text-xs font-medium px-4 py-2 rounded-xl cursor-pointer hover:bg-green-100 transition">
+                            <i class="fa-brands fa-weixin mr-1.5"></i>上传微信码
+                            <input type="file" name="wechat_qr_file" accept="image/*" class="hidden" onchange="previewQR(this, 'wechat-preview')">
+                        </label>
+                        <div id="wechat-preview" class="w-28 h-28 rounded-xl border border-gray-100 bg-gray-50 flex items-center justify-center overflow-hidden">
+                            {{if index .Settings "wechat_qr"}}
+                            <img src="{{index .Settings "wechat_qr"}}" class="w-full h-full object-cover">
+                            {{else}}
+                            <span class="text-gray-300 text-[10px]">未上传</span>
+                            {{end}}
+                        </div>
+                    </div>
+                </div>
+                <div>
+                    <label class="text-xs font-medium text-gray-500 mb-1 block">支付宝收款码</label>
+                    <div class="space-y-2">
+                        <label class="inline-flex bg-blue-50 text-blue-600 text-xs font-medium px-4 py-2 rounded-xl cursor-pointer hover:bg-blue-100 transition">
+                            <i class="fa-brands fa-alipay mr-1.5"></i>上传支付宝码
+                            <input type="file" name="alipay_qr_file" accept="image/*" class="hidden" onchange="previewQR(this, 'alipay-preview')">
+                        </label>
+                        <div id="alipay-preview" class="w-28 h-28 rounded-xl border border-gray-100 bg-gray-50 flex items-center justify-center overflow-hidden">
+                            {{if index .Settings "alipay_qr"}}
+                            <img src="{{index .Settings "alipay_qr"}}" class="w-full h-full object-cover">
+                            {{else}}
+                            <span class="text-gray-300 text-[10px]">未上传</span>
+                            {{end}}
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="flex justify-end">
+            <button type="submit" class="bg-indigo-600 text-white text-sm px-6 py-2.5 rounded-xl font-medium hover:bg-indigo-700 transition shadow-xs shadow-indigo-100">保存设置</button>
+        </div>
+    </form>
+
+        <div class="bg-white rounded-2xl p-6 shadow-xs border border-gray-100/50">
+            <h3 class="text-sm font-bold text-gray-500 mb-4">站点地图</h3>
+            <p class="text-xs text-gray-400 mb-3">一键生成 sitemap.xml，方便搜索引擎收录。</p>
+            <form method="POST" action="/admin/sitemap/generate">
+                <button type="submit" class="bg-green-500 text-white text-xs px-4 py-2 rounded-xl font-medium hover:bg-green-600 transition"><i class="fa-solid fa-sitemap mr-1"></i>生成站点地图</button>
+            </form>
+        </div>
+
+    <script>
+    function previewBanner(input) {
+        var preview = document.getElementById('banner-preview');
+        if (input.files && input.files[0]) {
+            var reader = new FileReader();
+            reader.onload = function(e) {
+                preview.innerHTML = '<img src="' + e.target.result + '" class="w-full h-full object-cover" alt="banner preview">';
+            };
+            reader.readAsDataURL(input.files[0]);
+        }
+    }
+    function previewQR(input, previewId) {
+        var preview = document.getElementById(previewId);
+        if (input.files && input.files[0]) {
+            var reader = new FileReader();
+            reader.onload = function(e) {
+                preview.innerHTML = '<img src="' + e.target.result + '" class="w-full h-full object-cover">';
+            };
+            reader.readAsDataURL(input.files[0]);
+        }
+    }
+    </script>
+{{template "admin_tail" .}}

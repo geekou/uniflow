@@ -1,0 +1,105 @@
+{{template "admin_head" .}}
+    <div class="flex items-center justify-between mb-6">
+        <h2 class="text-lg font-bold">关于我</h2>
+    </div>
+
+    <form method="POST" action="/admin/about" id="aboutForm" class="space-y-4">
+        <div class="bg-white rounded-2xl p-6 shadow-xs border border-gray-100/50 space-y-5">
+            <!-- 头像 + 姓名 -->
+            <div class="grid grid-cols-2 gap-4">
+                <div>
+                    <label class="text-xs font-medium text-gray-500 mb-1 block">姓名</label>
+                    <input type="text" name="name" value="{{defaultName .AboutMe.Name}}" class="w-full border border-gray-200 rounded-xl px-4 py-2.5 text-sm outline-none focus:ring-2 focus:ring-indigo-200 focus:border-indigo-400">
+                </div>
+                <div>
+                    <label class="text-xs font-medium text-gray-500 mb-1 block">头像</label>
+                    <div class="flex items-center gap-3">
+                        <img id="avatar-preview" src="{{if .AboutMe.Avatar}}{{.AboutMe.Avatar}}{{else}}https://api.dicebear.com/7.x/adventurer/svg?seed={{defaultName .AboutMe.Name}}{{end}}" class="w-12 h-12 rounded-full object-cover border shrink-0">
+                        <div class="flex-1">
+                            <input type="file" name="avatar_file" accept="image/*" onchange="previewAvatar(this)" class="w-full text-sm text-gray-500 file:mr-3 file:py-1.5 file:px-3 file:rounded-lg file:border-0 file:text-xs file:font-medium file:bg-indigo-50 file:text-indigo-600 hover:file:bg-indigo-100 file:cursor-pointer">
+                            <input type="hidden" name="avatar" value="{{.AboutMe.Avatar}}">
+                            <p class="text-xs text-gray-400 mt-1">支持 JPG/PNG/WebP，留空使用默认头像</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 个人简介 -->
+            <div>
+                <label class="text-xs font-medium text-gray-500 mb-1 block">个人简介</label>
+                <textarea name="bio" rows="3" class="w-full border border-gray-200 rounded-xl px-4 py-2.5 text-sm outline-none focus:ring-2 focus:ring-indigo-200 focus:border-indigo-400 resize-none">{{.AboutMe.Bio}}</textarea>
+            </div>
+
+            <!-- 所在地 -->
+            <div>
+                <label class="text-xs font-medium text-gray-500 mb-1 block">所在地</label>
+                <input type="text" name="location" value="{{.AboutMe.Location}}" class="w-full border border-gray-200 rounded-xl px-4 py-2.5 text-sm outline-none focus:ring-2 focus:ring-indigo-200 focus:border-indigo-400">
+            </div>
+        </div>
+
+        <!-- 社交链接 -->
+        <div class="bg-white rounded-2xl p-6 shadow-xs border border-gray-100/50 space-y-4">
+            <div class="flex items-center justify-between">
+                <div class="text-xs font-bold text-gray-400 tracking-wider">社交链接</div>
+                <button type="button" onclick="addSocialLink()" class="text-xs bg-indigo-50 text-indigo-600 px-3 py-1.5 rounded-lg hover:bg-indigo-100 transition font-medium"><i class="fa-solid fa-plus mr-1"></i>添加</button>
+            </div>
+
+            <div id="social-links" class="space-y-3">
+                {{range .AboutMe.SocialLinks}}
+                <div class="social-link-row flex items-center gap-3 bg-gray-50 p-3 rounded-xl">
+                    <div class="flex-1 grid grid-cols-3 gap-3">
+                        <input type="text" name="social_name" value="{{.Name}}" placeholder="名称（如 GitHub）" class="border border-gray-200 rounded-lg px-3 py-2 text-xs outline-none focus:ring-2 focus:ring-indigo-200 focus:border-indigo-400">
+                        <input type="text" name="social_url" value="{{.URL}}" placeholder="链接地址" class="border border-gray-200 rounded-lg px-3 py-2 text-xs outline-none focus:ring-2 focus:ring-indigo-200 focus:border-indigo-400">
+                        <input type="text" name="social_icon" value="{{.Icon}}" placeholder="图标类名（如 fa-brands fa-github）" class="border border-gray-200 rounded-lg px-3 py-2 text-xs outline-none focus:ring-2 focus:ring-indigo-200 focus:border-indigo-400">
+                    </div>
+                    <button type="button" onclick="removeSocialLink(this)" class="text-gray-400 hover:text-red-500 transition text-sm p-1"><i class="fa-solid fa-trash-can"></i></button>
+                </div>
+                {{end}}
+            </div>
+
+            <div id="no-links-hint" class="text-center py-4 text-xs text-gray-400 {{if .AboutMe.SocialLinks}}hidden{{end}}">
+                <i class="fa-solid fa-link-slash mr-1"></i>暂无社交链接，点击上方按钮添加
+            </div>
+        </div>
+
+        <div class="flex justify-end">
+            <button type="submit" class="bg-indigo-600 text-white text-sm px-6 py-2.5 rounded-xl font-medium hover:bg-indigo-700 transition shadow-xs shadow-indigo-100">保存</button>
+        </div>
+    </form>
+
+    <script>
+        function previewAvatar(input) {
+            if (input.files && input.files[0]) {
+                var reader = new FileReader();
+                reader.onload = function(e) {
+                    document.getElementById('avatar-preview').src = e.target.result;
+                };
+                reader.readAsDataURL(input.files[0]);
+            }
+        }
+        function addSocialLink() {
+            var container = document.getElementById('social-links');
+            var hint = document.getElementById('no-links-hint');
+            hint.classList.add('hidden');
+
+            var row = document.createElement('div');
+            row.className = 'social-link-row flex items-center gap-3 bg-gray-50 p-3 rounded-xl';
+            row.innerHTML = '<div class="flex-1 grid grid-cols-3 gap-3">' +
+                '<input type="text" name="social_name" value="" placeholder="名称（如 GitHub）" class="border border-gray-200 rounded-lg px-3 py-2 text-xs outline-none focus:ring-2 focus:ring-indigo-200 focus:border-indigo-400">' +
+                '<input type="text" name="social_url" value="" placeholder="链接地址" class="border border-gray-200 rounded-lg px-3 py-2 text-xs outline-none focus:ring-2 focus:ring-indigo-200 focus:border-indigo-400">' +
+                '<input type="text" name="social_icon" value="" placeholder="图标类名（如 fa-brands fa-github）" class="border border-gray-200 rounded-lg px-3 py-2 text-xs outline-none focus:ring-2 focus:ring-indigo-200 focus:border-indigo-400">' +
+                '</div>' +
+                '<button type="button" onclick="removeSocialLink(this)" class="text-gray-400 hover:text-red-500 transition text-sm p-1"><i class="fa-solid fa-trash-can"></i></button>';
+            container.appendChild(row);
+        }
+
+        function removeSocialLink(btn) {
+            var row = btn.closest('.social-link-row');
+            row.remove();
+            var container = document.getElementById('social-links');
+            if (container.children.length === 0) {
+                document.getElementById('no-links-hint').classList.remove('hidden');
+            }
+        }
+    </script>
+{{template "admin_tail" .}}

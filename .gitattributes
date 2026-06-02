@@ -1,0 +1,10 @@
+# Docker/Linux 环境统一使用 LF 换行
+* text=auto
+*.go text eol=lf
+*.html text eol=lf
+*.yml text eol=lf
+*.yaml text eol=lf
+*.sh text eol=lf
+Dockerfile text eol=lf
+go.mod text eol=lf
+go.sum text eol=lf

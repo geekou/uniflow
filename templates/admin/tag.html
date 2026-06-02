@@ -1,0 +1,28 @@
+{{template "admin_head" .}}
+    <div class="flex items-center justify-between mb-6">
+        <h2 class="text-lg font-bold">标签管理</h2>
+    </div>
+
+    <div class="bg-white rounded-2xl p-6 shadow-xs border border-gray-100/50 space-y-6">
+        <!-- Add Tag -->
+        <form method="POST" action="/admin/tags/save" class="flex items-end space-x-3">
+            <div class="flex-1">
+                <label class="text-xs font-medium text-gray-500 mb-1 block">标签名称</label>
+                <input type="text" name="name" required placeholder="如：Go语言" class="w-full border border-gray-200 rounded-xl px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-indigo-200 focus:border-indigo-400">
+            </div>
+            <button type="submit" class="bg-indigo-600 text-white text-xs px-5 py-2 rounded-xl font-medium hover:bg-indigo-700 transition">添加</button>
+        </form>
+
+        <!-- Tags Grid -->
+        <div class="flex flex-wrap gap-2">
+            {{range .Tags}}
+            <div class="flex items-center space-x-2 bg-gray-50 px-3 py-2 rounded-xl text-xs group">
+                <span class="text-gray-700 font-medium">{{.Name}}</span>
+                <span class="text-gray-300">{{.PostCount}}</span>
+                <button onclick="confirmAction('确定删除标签「{{.Name}}」？', '/admin/tags/delete/{{.ID}}')" class="text-gray-300 hover:text-red-500 transition"><i class="fa-solid fa-xmark"></i></button>
+            </div>
+            {{end}}
+        </div>
+        {{if eq (len .Tags) 0}}<div class="text-center py-8 text-sm text-gray-400">暂无标签</div>{{end}}
+    </div>
+{{template "admin_tail" .}}

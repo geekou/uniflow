@@ -1,0 +1,34 @@
+# 数据库文件
+uniflow.db
+uniflow.db-shm
+uniflow.db-wal
+data/
+
+# 用户上传
+uploads/
+
+# 备份
+backups/
+
+# 构建产物
+uniflow.exe
+uniflow
+
+# 开发工具
+.workbuddy/
+
+# 运行时文件
+*.log
+nul
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.DS_Store
+Thumbs.db
+
+# 临时文件
+tmp/

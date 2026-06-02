@@ -1,0 +1,412 @@
+{{define "admin_head"}}
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{{.PageTitle}} - UniFlow 管理</title>
+    <script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif; }
+        .menu-children { max-height: 0; overflow: hidden; transition: max-height 0.25s ease; }
+        .menu-children.open { max-height: 400px; }
+        .chevron-icon { transition: transform 0.2s ease; }
+        .chevron-icon.rotated { transform: rotate(180deg); }
+        .line-clamp-1 { display: -webkit-box; -webkit-line-clamp: 1; -webkit-box-orient: vertical; overflow: hidden; }
+        .line-clamp-2 { display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+    </style>
+    {{block "extra_head" .}}{{end}}
+</head>
+<body class="bg-[#F4F6F9] text-gray-800 min-h-screen">
+
+    <!-- Top Nav -->
+    <div class="fixed top-0 left-0 right-0 h-14 bg-white border-b border-gray-100 z-30 flex items-center justify-between px-6 shadow-xs">
+        <div class="flex items-center space-x-3">
+            <div class="w-8 h-8 bg-indigo-600 rounded-lg flex items-center justify-center text-white font-bold text-sm">U</div>
+            <span class="font-bold text-base text-gray-700">UniFlow 管理</span>
+        </div>
+        <div class="flex items-center space-x-4">
+            <a href="/" target="_blank" class="text-xs text-gray-400 hover:text-indigo-600 transition"><i class="fa-solid fa-external-link-alt mr-1"></i>前台首页</a>
+            <span class="text-sm text-gray-500"><i class="fa-regular fa-user mr-1"></i>{{.Username}}</span>
+            <a href="/admin/logout" class="text-xs bg-red-50 text-red-500 hover:bg-red-100 px-3 py-1.5 rounded-lg transition"><i class="fa-solid fa-right-from-bracket mr-1"></i>退出</a>
+        </div>
+    </div>
+
+    <!-- Sidebar -->
+    <div class="fixed top-14 left-0 bottom-0 w-60 bg-white border-r border-gray-100 overflow-y-auto z-20 p-4 space-y-1">
+
+        <!-- Dashboard -->
+        <a href="/admin" class="flex items-center space-x-2.5 px-3 py-2.5 rounded-xl text-sm font-medium transition {{if eq .ActiveMenu "dashboard"}}bg-indigo-50 text-indigo-600{{else}}text-gray-600 hover:bg-gray-50 hover:text-indigo-600{{end}}">
+            <i class="fa-solid fa-house w-4 text-center text-xs"></i><span>首页</span>
+        </a>
+
+        <!-- 文章管理 -->
+        <div class="pt-1">
+            <button onclick="toggleMenu('menu-posts')" class="w-full flex items-center justify-between px-3 py-2.5 rounded-xl text-sm font-medium transition {{if eq .ActiveMenu "posts"}}text-indigo-600{{else}}text-gray-600 hover:bg-gray-50 hover:text-indigo-600{{end}}">
+                <span class="flex items-center space-x-2.5"><i class="fa-solid fa-book w-4 text-center text-xs"></i><span>文章管理</span></span>
+                <i id="chevron-menu-posts" class="fa-solid fa-chevron-down text-[10px] chevron-icon {{if eq .ActiveMenu "posts"}}rotated{{end}}"></i>
+            </button>
+            <div id="menu-posts" class="menu-children pl-7 space-y-0.5 {{if eq .ActiveMenu "posts"}}open{{end}}">
+                <a href="/admin/posts/create" class="block px-3 py-2 rounded-lg text-xs transition {{if eq .ActiveSubmenu "post_create"}}text-indigo-600 font-medium bg-indigo-50{{else}}text-gray-500 hover:text-indigo-600 hover:bg-gray-50{{end}}">发布文章</a>
+                <a href="/admin/posts" class="block px-3 py-2 rounded-lg text-xs transition {{if eq .ActiveSubmenu "post_list"}}text-indigo-600 font-medium bg-indigo-50{{else}}text-gray-500 hover:text-indigo-600 hover:bg-gray-50{{end}}">文章列表</a>
+                <a href="/admin/categories" class="block px-3 py-2 rounded-lg text-xs transition {{if eq .ActiveSubmenu "categories"}}text-indigo-600 font-medium bg-indigo-50{{else}}text-gray-500 hover:text-indigo-600 hover:bg-gray-50{{end}}">分类管理</a>
+                <a href="/admin/tags" class="block px-3 py-2 rounded-lg text-xs transition {{if eq .ActiveSubmenu "tags"}}text-indigo-600 font-medium bg-indigo-50{{else}}text-gray-500 hover:text-indigo-600 hover:bg-gray-50{{end}}">标签管理</a>
+            </div>
+        </div>
+
+        <!-- 瞬间管理 -->
+        <div>
+            <button onclick="toggleMenu('menu-moments')" class="w-full flex items-center justify-between px-3 py-2.5 rounded-xl text-sm font-medium transition {{if eq .ActiveMenu "moments"}}text-indigo-600{{else}}text-gray-600 hover:bg-gray-50 hover:text-indigo-600{{end}}">
+                <span class="flex items-center space-x-2.5"><i class="fa-solid fa-bolt w-4 text-center text-xs"></i><span>瞬间管理</span></span>
+                <i id="chevron-menu-moments" class="fa-solid fa-chevron-down text-[10px] chevron-icon {{if eq .ActiveMenu "moments"}}rotated{{end}}"></i>
+            </button>
+            <div id="menu-moments" class="menu-children pl-7 space-y-0.5 {{if eq .ActiveMenu "moments"}}open{{end}}">
+                <a href="/admin/moments/create" class="block px-3 py-2 rounded-lg text-xs transition {{if eq .ActiveSubmenu "moment_create"}}text-indigo-600 font-medium bg-indigo-50{{else}}text-gray-500 hover:text-indigo-600 hover:bg-gray-50{{end}}">发布瞬间</a>
+                <a href="/admin/moments" class="block px-3 py-2 rounded-lg text-xs transition {{if eq .ActiveSubmenu "moment_list"}}text-indigo-600 font-medium bg-indigo-50{{else}}text-gray-500 hover:text-indigo-600 hover:bg-gray-50{{end}}">瞬间列表</a>
+            </div>
+        </div>
+
+        <!-- 消息管理 -->
+        <div>
+            <button onclick="toggleMenu('menu-messages')" class="w-full flex items-center justify-between px-3 py-2.5 rounded-xl text-sm font-medium transition {{if eq .ActiveMenu "messages"}}text-indigo-600{{else}}text-gray-600 hover:bg-gray-50 hover:text-indigo-600{{end}}">
+                <span class="flex items-center space-x-2.5"><i class="fa-solid fa-envelope w-4 text-center text-xs"></i><span>消息管理</span></span>
+                <i id="chevron-menu-messages" class="fa-solid fa-chevron-down text-[10px] chevron-icon {{if eq .ActiveMenu "messages"}}rotated{{end}}"></i>
+            </button>
+            <div id="menu-messages" class="menu-children pl-7 space-y-0.5 {{if eq .ActiveMenu "messages"}}open{{end}}">
+                <a href="/admin/comments" class="block px-3 py-2 rounded-lg text-xs transition {{if eq .ActiveSubmenu "comments"}}text-indigo-600 font-medium bg-indigo-50{{else}}text-gray-500 hover:text-indigo-600 hover:bg-gray-50{{end}}">评论管理</a>
+                <a href="/admin/guestbook" class="block px-3 py-2 rounded-lg text-xs transition {{if eq .ActiveSubmenu "guestbook"}}text-indigo-600 font-medium bg-indigo-50{{else}}text-gray-500 hover:text-indigo-600 hover:bg-gray-50{{end}}">留言管理</a>
+            </div>
+        </div>
+
+        <!-- 媒体管理 -->
+        <div>
+            <button onclick="toggleMenu('menu-media')" class="w-full flex items-center justify-between px-3 py-2.5 rounded-xl text-sm font-medium transition {{if eq .ActiveMenu "media"}}text-indigo-600{{else}}text-gray-600 hover:bg-gray-50 hover:text-indigo-600{{end}}">
+                <span class="flex items-center space-x-2.5"><i class="fa-solid fa-images w-4 text-center text-xs"></i><span>媒体管理</span></span>
+                <i id="chevron-menu-media" class="fa-solid fa-chevron-down text-[10px] chevron-icon {{if eq .ActiveMenu "media"}}rotated{{end}}"></i>
+            </button>
+            <div id="menu-media" class="menu-children pl-7 space-y-0.5 {{if eq .ActiveMenu "media"}}open{{end}}">
+                <a href="/admin/photos" class="block px-3 py-2 rounded-lg text-xs transition {{if eq .ActiveSubmenu "photos"}}text-indigo-600 font-medium bg-indigo-50{{else}}text-gray-500 hover:text-indigo-600 hover:bg-gray-50{{end}}">照片库</a>
+                <a href="/admin/videos" class="block px-3 py-2 rounded-lg text-xs transition {{if eq .ActiveSubmenu "videos"}}text-indigo-600 font-medium bg-indigo-50{{else}}text-gray-500 hover:text-indigo-600 hover:bg-gray-50{{end}}">视频库</a>
+            </div>
+        </div>
+
+        <!-- 网站设置 -->
+        <div>
+            <button onclick="toggleMenu('menu-settings')" class="w-full flex items-center justify-between px-3 py-2.5 rounded-xl text-sm font-medium transition {{if eq .ActiveMenu "settings"}}text-indigo-600{{else}}text-gray-600 hover:bg-gray-50 hover:text-indigo-600{{end}}">
+                <span class="flex items-center space-x-2.5"><i class="fa-solid fa-gear w-4 text-center text-xs"></i><span>网站设置</span></span>
+                <i id="chevron-menu-settings" class="fa-solid fa-chevron-down text-[10px] chevron-icon {{if eq .ActiveMenu "settings"}}rotated{{end}}"></i>
+            </button>
+            <div id="menu-settings" class="menu-children pl-7 space-y-0.5 {{if eq .ActiveMenu "settings"}}open{{end}}">
+                <a href="/admin/settings" class="block px-3 py-2 rounded-lg text-xs transition {{if eq .ActiveSubmenu "site_settings"}}text-indigo-600 font-medium bg-indigo-50{{else}}text-gray-500 hover:text-indigo-600 hover:bg-gray-50{{end}}">网站设置</a>
+                <a href="/admin/about" class="block px-3 py-2 rounded-lg text-xs transition {{if eq .ActiveSubmenu "about"}}text-indigo-600 font-medium bg-indigo-50{{else}}text-gray-500 hover:text-indigo-600 hover:bg-gray-50{{end}}">关于我</a>
+            </div>
+        </div>
+
+        <!-- 系统管理 -->
+        <div>
+            <button onclick="toggleMenu('menu-system')" class="w-full flex items-center justify-between px-3 py-2.5 rounded-xl text-sm font-medium transition {{if eq .ActiveMenu "system"}}text-indigo-600{{else}}text-gray-600 hover:bg-gray-50 hover:text-indigo-600{{end}}">
+                <span class="flex items-center space-x-2.5"><i class="fa-solid fa-lock w-4 text-center text-xs"></i><span>系统管理</span></span>
+                <i id="chevron-menu-system" class="fa-solid fa-chevron-down text-[10px] chevron-icon {{if eq .ActiveMenu "system"}}rotated{{end}}"></i>
+            </button>
+            <div id="menu-system" class="menu-children pl-7 space-y-0.5 {{if eq .ActiveMenu "system"}}open{{end}}">
+                <a href="/admin/users" class="block px-3 py-2 rounded-lg text-xs transition {{if eq .ActiveSubmenu "users"}}text-indigo-600 font-medium bg-indigo-50{{else}}text-gray-500 hover:text-indigo-600 hover:bg-gray-50{{end}}">用户管理</a>
+                <a href="/admin/menus" class="block px-3 py-2 rounded-lg text-xs transition {{if eq .ActiveSubmenu "menus"}}text-indigo-600 font-medium bg-indigo-50{{else}}text-gray-500 hover:text-indigo-600 hover:bg-gray-50{{end}}">菜单管理</a>
+                <a href="/admin/pages" class="block px-3 py-2 rounded-lg text-xs transition {{if eq .ActiveSubmenu "pages"}}text-indigo-600 font-medium bg-indigo-50{{else}}text-gray-500 hover:text-indigo-600 hover:bg-gray-50{{end}}">页面管理</a>
+                <a href="/admin/backup" class="block px-3 py-2 rounded-lg text-xs transition {{if eq .ActiveSubmenu "backup"}}text-indigo-600 font-medium bg-indigo-50{{else}}text-gray-500 hover:text-indigo-600 hover:bg-gray-50{{end}}">备份恢复</a>
+                <a href="/admin/logs" class="block px-3 py-2 rounded-lg text-xs transition {{if eq .ActiveSubmenu "logs"}}text-indigo-600 font-medium bg-indigo-50{{else}}text-gray-500 hover:text-indigo-600 hover:bg-gray-50{{end}}">日志管理</a>
+            </div>
+        </div>
+
+        <div class="pt-6 border-t border-gray-50 mt-2">
+            <!-- 建站计时器 -->
+            <div id="admin-uptime" class="text-center space-y-1 py-3" data-founded="{{.SiteFoundedAt}}">
+                <div class="text-[10px] text-gray-400 tracking-wider font-medium">本站已运行</div>
+                <div class="flex items-center justify-center gap-1 text-xs font-mono">
+                    <span id="admin-uptime-d" class="bg-indigo-50 text-indigo-600 rounded-md px-1.5 py-0.5 font-bold">0</span><span class="text-gray-400">天</span>
+                    <span id="admin-uptime-h" class="bg-indigo-50 text-indigo-600 rounded-md px-1.5 py-0.5 font-bold">0</span><span class="text-gray-400">时</span>
+                    <span id="admin-uptime-m" class="bg-indigo-50 text-indigo-600 rounded-md px-1.5 py-0.5 font-bold">0</span><span class="text-gray-400">分</span>
+                    <span id="admin-uptime-s" class="bg-indigo-50 text-indigo-600 rounded-md px-1.5 py-0.5 font-bold">0</span><span class="text-gray-400">秒</span>
+                </div>
+            </div>
+            <div class="text-center text-[10px] text-gray-300">&copy; 2026 UniFlow</div>
+        </div>
+    </div>
+
+    <!-- Main Content -->
+    <main class="ml-60 mt-14 p-6 min-h-screen">
+{{end}}
+
+{{define "admin_tail"}}
+    </main>
+
+    <!-- Toast notification -->
+    <div id="toast" class="fixed top-20 right-6 z-50 hidden">
+        <div id="toast-content" class="px-4 py-3 rounded-xl shadow-lg text-sm font-medium"></div>
+    </div>
+
+    <!-- Confirm Modal -->
+    <div id="confirm-modal" class="fixed inset-0 bg-black/40 z-50 hidden flex items-center justify-center">
+        <div class="bg-white rounded-2xl p-6 shadow-xl w-full max-w-sm mx-4 space-y-4">
+            <div class="text-center">
+                <i class="fa-solid fa-triangle-exclamation text-3xl text-amber-400 mb-2"></i>
+                <p id="confirm-msg" class="text-sm text-gray-700">确定执行此操作吗？</p>
+            </div>
+            <div class="flex space-x-3">
+                <button onclick="closeConfirm()" class="flex-1 px-4 py-2 rounded-xl bg-gray-100 text-gray-600 text-sm font-medium hover:bg-gray-200 transition">取消</button>
+                <button id="confirm-btn" class="flex-1 px-4 py-2 rounded-xl bg-red-500 text-white text-sm font-medium hover:bg-red-600 transition">确定</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Publish Modal (for posts) -->
+    <div id="publish-modal" class="fixed inset-0 bg-black/40 z-50 hidden flex items-center justify-center">
+        <div class="bg-white rounded-2xl shadow-xl w-full max-w-lg mx-4 max-h-[90vh] overflow-y-auto">
+            <div class="flex items-center justify-between p-5 border-b border-gray-100">
+                <h3 class="font-bold text-base">发布设置</h3>
+                <button onclick="closePublishModal()" class="text-gray-400 hover:text-gray-600"><i class="fa-solid fa-xmark"></i></button>
+            </div>
+            <div class="p-5 space-y-4">
+                <!-- Category -->
+                <div>
+                    <label class="text-xs font-medium text-gray-500 mb-1 block">文章分类</label>
+                    <select name="category_id" id="publish-category" class="w-full border border-gray-200 rounded-xl px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-indigo-200 focus:border-indigo-400">
+                        <option value="">请选择分类</option>
+                        {{range .Categories}}
+                        <option value="{{.ID}}" {{if .Selected}}selected{{end}}>{{.Name}}</option>
+                        {{end}}
+                    </select>
+                </div>
+                <!-- Tags -->
+                <div>
+                    <label class="text-xs font-medium text-gray-500 mb-2 block">文章标签</label>
+                    <div class="flex flex-wrap gap-2">
+                        {{range .Tags}}
+                        <label class="flex items-center space-x-1.5 text-xs bg-gray-50 px-3 py-1.5 rounded-lg cursor-pointer hover:bg-indigo-50 transition">
+                            <input type="checkbox" name="tags" value="{{.ID}}" class="accent-indigo-600" {{if .Selected}}checked{{end}}>
+                            <span>{{.Name}}</span>
+                        </label>
+                        {{end}}
+                    </div>
+                </div>
+                <!-- Cover -->
+                <div>
+                    <label class="text-xs font-medium text-gray-500 mb-1 block">封面图</label>
+                    <input type="file" name="cover" accept="image/*" onchange="previewCover(this)" class="text-xs text-gray-500 file:mr-2 file:py-1.5 file:px-3 file:rounded-lg file:border-0 file:bg-indigo-50 file:text-indigo-600 file:text-xs file:font-medium file:cursor-pointer">
+                    <div id="cover-preview" class="mt-2 hidden"><img id="cover-img" class="w-40 h-24 object-cover rounded-xl border"></div>
+                    {{if .PostCover}}<div class="mt-2"><img src="{{.PostCover}}" class="w-40 h-24 object-cover rounded-xl border" id="existing-cover"></div>{{end}}
+                </div>
+                <!-- Is Top -->
+                <div class="flex items-center justify-between">
+                    <label class="text-xs font-medium text-gray-500">是否置顶</label>
+                    <label class="relative inline-flex items-center cursor-pointer">
+                        <input type="checkbox" name="is_top" value="1" class="sr-only peer" {{if .IsTop}}checked{{end}}>
+                        <div class="w-9 h-5 bg-gray-200 peer-focus:ring-2 peer-focus:ring-indigo-200 rounded-full peer peer-checked:after:translate-x-full after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-indigo-600"></div>
+                    </label>
+                </div>
+                <!-- Privacy -->
+                <div>
+                    <label class="text-xs font-medium text-gray-500 mb-1 block">发布权限</label>
+                    <select name="privacy" class="w-full border border-gray-200 rounded-xl px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-indigo-200 focus:border-indigo-400">
+                        <option value="public" {{if eq .Privacy "public"}}selected{{end}}>公开发布</option>
+                        <option value="private" {{if eq .Privacy "private"}}selected{{end}}>私密</option>
+                    </select>
+                </div>
+                <!-- PublishAt -->
+                <div>
+                    <label class="text-xs font-medium text-gray-500 mb-1 block">定时发布（留空则立即发布）</label>
+                    <input type="datetime-local" name="publish_at" value="{{.PublishAt}}" class="w-full border border-gray-200 rounded-xl px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-indigo-200 focus:border-indigo-400">
+                </div>
+            </div>
+            <div class="flex space-x-3 p-5 border-t border-gray-100">
+                <button onclick="closePublishModal()" class="flex-1 px-4 py-2.5 rounded-xl bg-gray-100 text-gray-600 text-sm font-medium hover:bg-gray-200 transition">取消</button>
+                <button onclick="submitPost()" class="flex-1 px-4 py-2.5 rounded-xl bg-indigo-600 text-white text-sm font-medium hover:bg-indigo-700 transition shadow-xs shadow-indigo-100">确认提交</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Menu toggle: 关闭其他菜单，切换当前菜单
+        function toggleMenu(id) {
+            // 关闭所有其他菜单
+            var allMenus = document.querySelectorAll('.menu-children');
+            var allChevrons = document.querySelectorAll('.chevron-icon');
+            for (var i = 0; i < allMenus.length; i++) {
+                if (allMenus[i].id !== id) {
+                    allMenus[i].classList.remove('open');
+                }
+            }
+            for (var j = 0; j < allChevrons.length; j++) {
+                if (allChevrons[j].id !== 'chevron-' + id) {
+                    allChevrons[j].classList.remove('rotated');
+                }
+            }
+            // 切换当前菜单
+            var el = document.getElementById(id);
+            var chevron = document.getElementById('chevron-' + id);
+            if (el) el.classList.toggle('open');
+            if (chevron) chevron.classList.toggle('rotated');
+        }
+
+        // Toast
+        function showToast(msg, type) {
+            var toast = document.getElementById('toast');
+            var content = document.getElementById('toast-content');
+            var bg = type === 'success' ? 'bg-green-500 text-white' : type === 'error' ? 'bg-red-500 text-white' : 'bg-white text-gray-700 border border-gray-200';
+            content.className = 'px-4 py-3 rounded-xl shadow-lg text-sm font-medium ' + bg;
+            content.textContent = msg;
+            toast.classList.remove('hidden');
+            setTimeout(function() { toast.classList.add('hidden'); }, 3000);
+        }
+
+        // Confirm dialog
+        var pendingDeleteUrl = '';
+        function confirmAction(msg, url) {
+            document.getElementById('confirm-msg').textContent = msg;
+            pendingDeleteUrl = url;
+            document.getElementById('confirm-modal').classList.remove('hidden');
+        }
+        function closeConfirm() {
+            document.getElementById('confirm-modal').classList.add('hidden');
+            pendingDeleteUrl = '';
+        }
+        document.getElementById('confirm-btn').addEventListener('click', function() {
+            if (pendingDeleteUrl) {
+                var url = pendingDeleteUrl;
+                closeConfirm();
+                fetch(url, {method: 'POST', headers: {'X-Requested-With': 'fetch'}})
+                    .then(function(r) { return r.text(); })
+                    .then(function(text) {
+                        try {
+                            var data = JSON.parse(text);
+                            if (data.ok) {
+                                var action = url.includes('/delete/') ? '删除成功' : url.includes('/restore/') ? '恢复成功，服务重启中...' : '操作成功';
+                                showToast(action, 'success');
+                            } else {
+                                showToast(data.msg || '操作失败', 'error');
+                                return;
+                            }
+                        } catch(e) {
+                            // 后端返回重定向(HTML)，说明操作成功
+                            showToast('操作成功', 'success');
+                        }
+                        var delay = url.includes('/restore/') ? 3000 : 800;
+                        setTimeout(function() { location.reload(); }, delay);
+                    })
+                    .catch(function() { showToast('请求失败', 'error'); });
+            }
+        });
+
+        // Publish modal
+        function openPublishModal() {
+            document.getElementById('publish-modal').classList.remove('hidden');
+        }
+        function closePublishModal() {
+            document.getElementById('publish-modal').classList.add('hidden');
+        }
+        function previewCover(input) {
+            if (input.files && input.files[0]) {
+                var reader = new FileReader();
+                reader.onload = function(e) {
+                    var prev = document.getElementById('cover-preview');
+                    var img = document.getElementById('cover-img');
+                    img.src = e.target.result;
+                    prev.classList.remove('hidden');
+                    var existing = document.getElementById('existing-cover');
+                    if (existing) existing.style.display = 'none';
+                };
+                reader.readAsDataURL(input.files[0]);
+            }
+        }
+
+        // Site uptime counter
+        (function() {
+            var el = document.getElementById('admin-uptime');
+            if (!el) return;
+            var founded = el.getAttribute('data-founded');
+            if (!founded) {
+                el.style.display = 'none';
+                return;
+            }
+            var foundedDate = new Date(founded);
+            if (isNaN(foundedDate.getTime())) {
+                el.style.display = 'none';
+                return;
+            }
+            function update() {
+                var now = new Date();
+                var diff = now - foundedDate;
+                if (diff < 0) diff = 0;
+                var days = Math.floor(diff / 86400000);
+                var hours = Math.floor((diff % 86400000) / 3600000);
+                var minutes = Math.floor((diff % 3600000) / 60000);
+                var seconds = Math.floor((diff % 60000) / 1000);
+                var dEl = document.getElementById('admin-uptime-d');
+                var hEl = document.getElementById('admin-uptime-h');
+                var mEl = document.getElementById('admin-uptime-m');
+                var sEl = document.getElementById('admin-uptime-s');
+                if (dEl) dEl.textContent = days;
+                if (hEl) hEl.textContent = String(hours).padStart(2, '0');
+                if (mEl) mEl.textContent = String(minutes).padStart(2, '0');
+                if (sEl) sEl.textContent = String(seconds).padStart(2, '0');
+            }
+            update();
+            setInterval(update, 1000);
+        })();
+    </script>
+
+    <!-- Auto intercept POST forms for toast feedback -->
+    <script>
+    (function() {
+        document.addEventListener('submit', function(e) {
+            var form = e.target;
+            if (form.method.toLowerCase() !== 'post') return;
+            if (form.hasAttribute('data-no-toast')) return;
+            if (form.closest('#publish-modal')) return;
+            e.preventDefault();
+
+            var formData = new FormData(form);
+            var actionMsg = '';
+            var act = form.getAttribute('action') || '';
+            if (act.includes('/create') || act.includes('/save')) actionMsg = '保存成功';
+            else if (act.includes('/edit/') || act.includes('/settings') || act.includes('/about')) actionMsg = '更新成功';
+            else if (act.includes('/delete/')) actionMsg = '删除成功';
+            else if (act.includes('/reply')) actionMsg = '回复成功';
+            else if (act.includes('/sitemap')) actionMsg = '生成成功';
+            else actionMsg = '操作成功';
+
+            fetch(form.action, { method: 'POST', body: formData, headers: {'X-Requested-With': 'fetch'} })
+                .then(function(r) {
+                    // Check if response is JSON
+                    var ct = r.headers.get('content-type') || '';
+                    if (ct.includes('application/json')) {
+                        return r.json().then(function(d) {
+                            if (d.ok) {
+                                showToast(d.msg || actionMsg, 'success');
+                            } else {
+                                showToast(d.msg || '操作失败', 'error');
+                                return Promise.reject();
+                            }
+                        });
+                    }
+                    // Non-JSON (redirect or HTML) = success
+                    return r.text().then(function() {
+                        showToast(actionMsg, 'success');
+                    });
+                })
+                .then(function() {
+                    // Redirect: follow the original action or reload
+                    var redirect = form.getAttribute('data-redirect');
+                    if (redirect) {
+                        setTimeout(function() { window.location.href = redirect; }, 600);
+                    } else {
+                        setTimeout(function() { location.reload(); }, 600);
+                    }
+                })
+                .catch(function() {});
+        });
+    })();
+    </script>
+</body>
+</html>
+{{end}}

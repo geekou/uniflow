@@ -1,0 +1,168 @@
+{{template "admin_head" .}}
+    <div class="flex items-center justify-between mb-6">
+        <h2 class="text-lg font-bold">{{if eq .Type "photos"}}照片库{{else}}视频库{{end}}</h2>
+        <div id="batch-bar" class="hidden flex items-center gap-3">
+            <span id="selected-count" class="text-xs text-gray-500">已选 0 项</span>
+            <button onclick="batchDelete()" id="batch-delete-btn" class="px-3 py-1.5 bg-red-500 text-white text-xs rounded-lg hover:bg-red-600 transition opacity-50 cursor-not-allowed" disabled>
+                <i class="fa-solid fa-trash mr-1"></i>批量删除
+            </button>
+            <button onclick="clearSelection()" class="px-3 py-1.5 bg-gray-100 text-gray-600 text-xs rounded-lg hover:bg-gray-200 transition">取消选择</button>
+        </div>
+    </div>
+
+    <!-- Upload Area -->
+    <div class="bg-white rounded-2xl p-6 shadow-xs border border-gray-100/50 mb-6">
+        <form method="POST" data-no-toast action="/admin/{{.Type}}/upload" enctype="multipart/form-data" class="border-2 border-dashed border-gray-200 rounded-xl p-8 text-center hover:border-indigo-300 transition cursor-pointer" id="upload-area">
+            <input type="file" name="files" multiple accept="{{if eq .Type "photos"}}image/*{{else}}video/*{{end}}" id="file-input" class="hidden" onchange="handleFiles(this)">
+            <i class="fa-solid fa-cloud-arrow-up text-3xl text-gray-300 mb-3 block"></i>
+            <p class="text-sm text-gray-500">点击或拖拽文件到此处上传</p>
+            <p class="text-xs text-gray-400 mt-1">支持批量上传，图片超过 2MB 自动压缩</p>
+        </form>
+    </div>
+
+    <!-- File Grid -->
+    <div class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4" id="media-grid">
+        {{range .Files}}
+        <div class="bg-white rounded-2xl shadow-xs border border-gray-100/50 overflow-hidden group relative media-item" data-name="{{.Name}}">
+            <!-- 选择复选框 -->
+            <label class="absolute top-2 left-2 z-10 cursor-pointer select-none">
+                <input type="checkbox" class="media-check hidden" data-name="{{.Name}}" onchange="updateSelection()">
+                <span class="inline-flex items-center justify-center w-6 h-6 rounded-md border-2 border-white/70 bg-black/20 text-white text-xs opacity-0 group-hover:opacity-100 transition check-icon">
+                    <i class="fa-solid fa-check text-[10px]"></i>
+                </span>
+            </label>
+            <div class="aspect-square bg-gray-100">
+                {{if eq $.Type "photos"}}
+                <img src="{{.URL}}" class="w-full h-full object-cover" loading="lazy">
+                {{else}}
+                <video src="{{.URL}}" class="w-full h-full object-cover"></video>
+                {{end}}
+            </div>
+            <div class="p-3 space-y-1">
+                <p class="text-xs text-gray-600 line-clamp-1">{{.Name}}</p>
+                <div class="flex items-center justify-between">
+                    <span class="text-[10px] text-gray-400">{{.Size}}</span>
+                    <button onclick="singleDelete('{{.Name}}')" class="text-red-400 hover:text-red-600 text-xs opacity-0 group-hover:opacity-100 transition"><i class="fa-solid fa-trash"></i></button>
+                </div>
+            </div>
+        </div>
+        {{end}}
+    </div>
+    {{if eq (len .Files) 0}}<div class="bg-white rounded-2xl p-12 shadow-xs border border-gray-100/50 text-center text-sm text-gray-400">暂无文件</div>{{end}}
+
+    <script>
+        // 上传处理
+        document.getElementById('upload-area').addEventListener('click', function() { document.getElementById('file-input').click(); });
+        function handleFiles(input) {
+            if (input.files.length > 0) {
+                var fd = new FormData();
+                for (var i = 0; i < input.files.length; i++) {
+                    fd.append('files', input.files[i]);
+                }
+                var btn = document.querySelector('#upload-area');
+                btn.style.opacity = '0.5';
+                fetch('/admin/{{.Type}}/upload', { method: 'POST', body: fd, credentials: 'same-origin' })
+                    .then(function(r) {
+                        if (r.ok || r.redirected) {
+                            showToast('上传成功', 'success');
+                            setTimeout(function() { location.reload(); }, 600);
+                        } else {
+                            showToast('上传失败', 'error');
+                            btn.style.opacity = '1';
+                        }
+                    })
+                    .catch(function() { showToast('上传失败', 'error'); btn.style.opacity = '1'; });
+            }
+        }
+
+        // 多选逻辑
+        function getChecked() {
+            var checks = document.querySelectorAll('.media-check:checked');
+            return Array.from(checks).map(function(c) { return c.dataset.name; });
+        }
+
+        function updateSelection() {
+            var names = getChecked();
+            var count = names.length;
+            document.getElementById('selected-count').textContent = '已选 ' + count + ' 项';
+            var batchBar = document.getElementById('batch-bar');
+            var batchBtn = document.getElementById('batch-delete-btn');
+
+            if (count > 0) {
+                batchBar.classList.remove('hidden');
+                batchBar.classList.add('flex');
+                batchBtn.disabled = false;
+                batchBtn.classList.remove('opacity-50', 'cursor-not-allowed');
+            } else {
+                batchBar.classList.add('hidden');
+                batchBar.classList.remove('flex');
+                batchBtn.disabled = true;
+                batchBtn.classList.add('opacity-50', 'cursor-not-allowed');
+            }
+
+            // 更新选中项的视觉状态
+            document.querySelectorAll('.media-item').forEach(function(item) {
+                var cb = item.querySelector('.media-check');
+                var icon = item.querySelector('.check-icon');
+                if (cb.checked) {
+                    item.classList.add('ring-2', 'ring-indigo-400');
+                    icon.classList.add('bg-indigo-500', 'border-indigo-500');
+                    icon.classList.remove('bg-black/20', 'border-white/70', 'opacity-0');
+                } else {
+                    item.classList.remove('ring-2', 'ring-indigo-400');
+                    icon.classList.remove('bg-indigo-500', 'border-indigo-500');
+                    icon.classList.add('bg-black/20', 'border-white/70', 'opacity-0');
+                }
+            });
+        }
+
+        function clearSelection() {
+            document.querySelectorAll('.media-check').forEach(function(cb) { cb.checked = false; });
+            updateSelection();
+        }
+
+        // 单个删除
+        function singleDelete(name) {
+            if (!confirm('确定删除 ' + name + '？')) return;
+            fetch('/admin/media/delete/' + encodeURIComponent(name), {
+                method: 'POST',
+                headers: { 'X-Requested-With': 'fetch' },
+                credentials: 'same-origin'
+            })
+            .then(function(r) { return r.json(); })
+            .then(function(data) {
+                if (data.ok) {
+                    showToast('删除成功', 'success');
+                    setTimeout(function() { location.reload(); }, 600);
+                } else {
+                    showToast(data.msg || '删除失败', 'error');
+                }
+            })
+            .catch(function() { showToast('删除失败', 'error'); });
+        }
+
+        // 批量删除
+        function batchDelete() {
+            var names = getChecked();
+            if (names.length === 0) return;
+            if (!confirm('确定删除选中的 ' + names.length + ' 个文件？此操作不可恢复。')) return;
+
+            fetch('/admin/media/batch-delete', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json', 'X-Requested-With': 'fetch' },
+                credentials: 'same-origin',
+                body: JSON.stringify({ names: names })
+            })
+            .then(function(r) { return r.json(); })
+            .then(function(data) {
+                if (data.ok) {
+                    showToast('成功删除 ' + data.deleted + ' 个文件', 'success');
+                    setTimeout(function() { location.reload(); }, 600);
+                } else {
+                    showToast(data.msg || '删除失败', 'error');
+                }
+            })
+            .catch(function() { showToast('删除失败', 'error'); });
+        }
+    </script>
+{{template "admin_tail" .}}
