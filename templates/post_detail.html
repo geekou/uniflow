@@ -454,7 +454,7 @@
                                         </label>
                                     </div>
                                     <!-- 图片预览 -->
-                                    <div id="commentImagePreview" class="hidden mt-2 relative inline-block">
+                                    <div id="commentImagePreview" style="display:none" class="mt-2 relative inline-block">
                                         <img id="commentImagePreviewImg" src="" class="max-h-24 rounded-lg border border-gray-200">
                                         <button type="button" onclick="clearCommentImage()" class="absolute -top-1.5 -right-1.5 w-5 h-5 bg-gray-700 text-white rounded-full text-xs flex items-center justify-center hover:bg-red-500 transition">&times;</button>
                                     </div>
@@ -629,14 +629,14 @@
             var img = document.getElementById('commentImagePreviewImg');
             if (input.files && input.files[0]) {
                 img.src = URL.createObjectURL(input.files[0]);
-                preview.classList.remove('hidden');
+                preview.style.display = 'inline-block';
             }
         }
         function clearCommentImage() {
             var input = document.querySelector('input[name="image"]');
             if (input) input.value = '';
             var preview = document.getElementById('commentImagePreview');
-            if (preview) preview.classList.add('hidden');
+            if (preview) preview.style.display = 'none';
         }
 
         function toggleEmojiPicker() {

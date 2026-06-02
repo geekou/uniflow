@@ -296,7 +296,7 @@
                                                     <input type="file" name="image" accept="image/*" onchange="previewMomentImage(this,{{.ID}})" class="hidden">
                                                 </label>
                                             </div>
-                                            <div id="moment-image-preview-{{.ID}}" class="hidden mt-2 relative inline-block">
+                                            <div id="moment-image-preview-{{.ID}}" style="display:none" class="mt-2 relative inline-block">
                                                 <img id="moment-image-preview-img-{{.ID}}" src="" class="max-h-24 rounded-lg border border-gray-200">
                                                 <button type="button" onclick="clearMomentImage({{.ID}})" class="absolute -top-1.5 -right-1.5 w-5 h-5 bg-gray-700 text-white rounded-full text-xs flex items-center justify-center hover:bg-red-500 transition">&times;</button>
                                             </div>
@@ -578,7 +578,7 @@
             var img = document.getElementById('moment-image-preview-img-' + id);
             if (input.files && input.files[0]) {
                 img.src = URL.createObjectURL(input.files[0]);
-                preview.classList.remove('hidden');
+                preview.style.display = 'inline-block';
             }
         }
         function clearMomentImage(id) {
@@ -589,7 +589,7 @@
                 if (btn) input = btn.querySelector('input[type=file]');
             }
             if (input) input.value = '';
-            if (preview) preview.classList.add('hidden');
+            if (preview) preview.style.display = 'none';
         }
 
         function insertMomentEmoji(btn, emoji) {
