@@ -21,7 +21,7 @@ import (
 )
 
 // Version 当前版本号
-const Version = "v1.1"
+const Version = "v1.0.1"
 
 // htmlSanitizer 使用 bluemonday UGCPolicy 过滤用户生成的 HTML（允许 Markdown 渲染后的常见标签）
 var htmlSanitizer = bluemonday.UGCPolicy().
