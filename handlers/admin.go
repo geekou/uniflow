@@ -105,7 +105,7 @@ func AdminLogout(c *gin.Context) {
 
 // ============ 仪表盘 ============
 
-func AdminDashboard(db *sql.DB) gin.HandlerFunc {
+func AdminDashboard(db *sql.DB, version string) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		data := adminData("仪表盘", "dashboard", "", getAdminUsername(c), db)
 
@@ -119,6 +119,7 @@ func AdminDashboard(db *sql.DB) gin.HandlerFunc {
 			"CommentCount": commentCount, "GuestbookCount": guestbookCount,
 		}
 		data["Now"] = time.Now().Format("2006-01-02 15:04")
+		data["Version"] = version
 
 		c.HTML(http.StatusOK, "admin/dashboard.html", data)
 	}
@@ -2212,5 +2213,35 @@ func SetupPost(db *sql.DB) gin.HandlerFunc {
 		setSessionCookie(c, SignCookie(sessionToken), 86400)
 
 		c.Redirect(http.StatusFound, "/admin")
+	}
+}
+
+// ============ 版本检查 ============
+
+// AdminCheckUpdate 检查 GitHub 最新版本
+func AdminCheckUpdate(currentVersion string) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		client := &http.Client{Timeout: 10 * time.Second}
+		resp, err := client.Get("https://api.github.com/repos/geekou/uniflow/releases/latest")
+		if err != nil {
+			c.JSON(http.StatusOK, gin.H{"ok": true, "current": currentVersion, "latest": "", "hasUpdate": false, "error": "无法连接 GitHub，请稍后重试"})
+			return
+		}
+		defer resp.Body.Close()
+
+		body, _ := io.ReadAll(resp.Body)
+		var release struct {
+			TagName string `json:"tag_name"`
+		}
+		json.Unmarshal(body, &release)
+
+		hasUpdate := release.TagName != "" && release.TagName != currentVersion
+
+		c.JSON(http.StatusOK, gin.H{
+			"ok":        true,
+			"current":   currentVersion,
+			"latest":    release.TagName,
+			"hasUpdate": hasUpdate,
+		})
 	}
 }

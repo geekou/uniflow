@@ -36,6 +36,18 @@
         </div>
     </div>
 
+    <!-- 版本信息 -->
+    <div class="bg-white rounded-2xl p-5 shadow-xs border border-gray-100/50 mb-6 flex items-center justify-between">
+        <div class="flex items-center space-x-3">
+            <span class="text-xs text-gray-400">当前版本</span>
+            <span class="text-sm font-bold text-indigo-600 bg-indigo-50 px-3 py-1 rounded-lg">{{.Version}}</span>
+        </div>
+        <button id="check-update-btn" onclick="checkUpdate()" class="text-xs bg-white text-gray-600 px-3 py-2 rounded-xl border border-gray-200 hover:bg-gray-50 hover:text-indigo-600 transition font-medium">
+            <i class="fa-solid fa-arrows-rotate mr-1"></i>检查更新
+        </button>
+    </div>
+    <div id="update-result" class="hidden mb-6"></div>
+
     <!-- Quick Actions -->
     <div class="bg-white rounded-2xl p-6 shadow-xs border border-gray-100/50">
         <h3 class="text-sm font-bold text-gray-500 mb-4">快捷操作</h3>
@@ -54,4 +66,39 @@
             </a>
         </div>
     </div>
+
+<script>
+function checkUpdate() {
+    var btn = document.getElementById('check-update-btn');
+    var result = document.getElementById('update-result');
+    btn.disabled = true;
+    btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin mr-1"></i>检查中...';
+    result.className = 'hidden';
+
+    fetch('/admin/api/version/check')
+        .then(function(r) { return r.json(); })
+        .then(function(d) {
+            btn.disabled = false;
+            btn.innerHTML = '<i class="fa-solid fa-arrows-rotate mr-1"></i>检查更新';
+            result.className = 'bg-white rounded-2xl p-4 shadow-xs border';
+
+            if (d.error) {
+                result.className += ' border-amber-200';
+                result.innerHTML = '<div class="flex items-center space-x-2 text-amber-600 text-sm"><i class="fa-solid fa-triangle-exclamation"></i><span>' + d.error + '</span></div>';
+            } else if (d.hasUpdate) {
+                result.className += ' border-green-200';
+                result.innerHTML = '<div class="flex items-center justify-between"><div class="flex items-center space-x-2 text-green-600 text-sm"><i class="fa-solid fa-circle-check"></i><span>发现新版本 <b>' + d.latest + '</b>（当前 ' + d.current + '）</span></div><a href="https://github.com/geekou/uniflow/releases/latest" target="_blank" class="text-xs bg-green-600 text-white px-3 py-1.5 rounded-lg hover:bg-green-700 transition">查看更新</a></div>';
+            } else {
+                result.className += ' border-gray-200';
+                result.innerHTML = '<div class="flex items-center space-x-2 text-gray-500 text-sm"><i class="fa-solid fa-circle-check text-green-500"></i><span>已是最新版本 ' + d.current + '</span></div>';
+            }
+        })
+        .catch(function() {
+            btn.disabled = false;
+            btn.innerHTML = '<i class="fa-solid fa-arrows-rotate mr-1"></i>检查更新';
+            result.className = 'bg-white rounded-2xl p-4 shadow-xs border border-amber-200';
+            result.innerHTML = '<div class="flex items-center space-x-2 text-amber-600 text-sm"><i class="fa-solid fa-triangle-exclamation"></i><span>网络错误，请稍后重试</span></div>';
+        });
+}
+</script>
 {{template "admin_tail" .}}
