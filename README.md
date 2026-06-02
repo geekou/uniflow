@@ -73,14 +73,12 @@
 ### 一键部署
 
 ```bash
-# 只需 docker-compose.yml 一个文件
-wget https://raw.githubusercontent.com/geekou/uniflow/main/docker-compose.yml
-mkdir -p data uploads backups
+git clone https://github.com/geekou/uniflow.git
+cd uniflow
 docker compose up -d
 ```
 
-> 镜像托管在 GitHub Container Registry，公开仓库无需登录即可拉取。
-> 如果是私有仓库，需先 `docker login ghcr.io -u 你的用户名`。
+> 首次启动会在容器内编译 Go 源码（约 2 分钟），编译完自动启动。
 
 ### 初始化
 
@@ -102,7 +100,7 @@ docker compose up -d
 ```yaml
 services:
   uniflow:
-    image: ghcr.io/geekou/uniflow:latest  # GitHub Actions 自动构建
+    build: .
     container_name: uniflow
     restart: unless-stopped
     ports:
@@ -117,7 +115,7 @@ services:
       - DB_PATH=/app/data/uniflow.db
 ```
 
-更新命令：`docker compose pull && docker compose up -d`
+> 后续更新：`git pull && docker compose up -d --build`
 
 反向代理建议配合 Nginx Proxy Manager 启用 HTTPS。
 

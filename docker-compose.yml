@@ -1,7 +1,6 @@
-# 生产环境 —— 拉取 GitHub Actions 预构建镜像，零编译
 services:
   uniflow:
-    image: ghcr.io/geekou/uniflow:latest
+    build: .
     container_name: uniflow
     restart: unless-stopped
     ports:
