@@ -1,0 +1,14 @@
+# 极简生产镜像 —— 预编译二进制，不依赖 Go 工具链
+FROM alpine:3.21
+
+RUN apk add --no-cache ca-certificates tzdata
+ENV TZ=Asia/Shanghai
+
+WORKDIR /app
+COPY uniflow-linux ./uniflow
+COPY templates ./templates
+COPY static ./static
+RUN mkdir -p /app/uploads /app/backups && chmod +x /app/uniflow
+
+EXPOSE 9090
+CMD ["./uniflow"]

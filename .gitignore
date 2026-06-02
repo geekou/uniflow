@@ -13,6 +13,8 @@ backups/
 # 构建产物
 uniflow.exe
 uniflow
+uniflow-linux
+uniflow-linux-arm64
 
 # 开发工具
 .workbuddy/
