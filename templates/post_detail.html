@@ -445,6 +445,16 @@
                                             class="absolute bottom-2 right-2 p-1.5 rounded-lg hover:bg-gray-100 text-gray-400 hover:text-gray-600 text-base transition" title="表情">
                                             &#x1F600;
                                         </button>
+                                        <!-- 登录用户图片上传 -->
+                                        <label id="commentImageBtn" class="hidden absolute bottom-2 right-9 p-1.5 rounded-lg hover:bg-gray-100 text-gray-400 hover:text-gray-600 text-base transition cursor-pointer" title="添加图片">
+                                            &#x1F4F7;
+                                            <input type="file" name="image" accept="image/*" onchange="previewCommentImage(this)" class="hidden">
+                                        </label>
+                                    </div>
+                                    <!-- 图片预览 -->
+                                    <div id="commentImagePreview" class="hidden mt-2 relative inline-block">
+                                        <img id="commentImagePreviewImg" src="" class="max-h-24 rounded-lg border border-gray-200">
+                                        <button type="button" onclick="clearCommentImage()" class="absolute -top-1.5 -right-1.5 w-5 h-5 bg-gray-700 text-white rounded-full text-xs flex items-center justify-center hover:bg-red-500 transition">&times;</button>
                                     </div>
                                     <!-- Emoji Picker Panel -->
                                     <div id="emojiPicker" class="hidden mt-1 p-2 bg-white border border-gray-200 rounded-xl shadow-lg grid grid-cols-10 gap-1 max-h-36 overflow-y-auto">
@@ -608,6 +618,22 @@
         (function(){var p=location.pathname;document.querySelectorAll('nav a,[id^=sidebar] a').forEach(function(a){if(a.getAttribute('href')===p||(p!=='/'&&a.getAttribute('href')!=='/'&&p.startsWith(a.getAttribute('href')))){a.classList.add('text-indigo-600','font-semibold');}});})();
 
         // 表情选择器
+        // 评论图片预览
+        function previewCommentImage(input) {
+            var preview = document.getElementById('commentImagePreview');
+            var img = document.getElementById('commentImagePreviewImg');
+            if (input.files && input.files[0]) {
+                img.src = URL.createObjectURL(input.files[0]);
+                preview.classList.remove('hidden');
+            }
+        }
+        function clearCommentImage() {
+            var input = document.querySelector('input[name="image"]');
+            if (input) input.value = '';
+            var preview = document.getElementById('commentImagePreview');
+            if (preview) preview.classList.add('hidden');
+        }
+
         function toggleEmojiPicker() {
             document.getElementById('emojiPicker').classList.toggle('hidden');
         }
@@ -745,6 +771,9 @@
                 if (!authorRow) return;
                 if (data.loggedIn) {
                     authorRow.classList.add('hidden');
+                    // 登录用户显示图片上传按钮
+                    var imgBtn = document.getElementById('commentImageBtn');
+                    if (imgBtn) imgBtn.classList.remove('hidden');
                 } else {
                     authorRow.classList.remove('hidden');
                 }

@@ -2037,6 +2037,24 @@ func CommentSubmit(db *sql.DB) gin.HandlerFunc {
 			return
 		}
 
+		// 登录用户可上传评论图片
+		var imageURL string
+		if loginUsername != "" {
+			file, fh, fErr := c.Request.FormFile("image")
+			if fErr == nil {
+				defer file.Close()
+				projectRoot := getProjectRoot(c)
+				uploadsDir := filepath.Join(projectRoot, "uploads")
+				os.MkdirAll(uploadsDir, 0755)
+				tmpPath := filepath.Join(uploadsDir, "tmp_comment_"+fh.Filename)
+				if saveErr := c.SaveUploadedFile(fh, tmpPath); saveErr == nil {
+					if filename, _, procErr := utils.ProcessUploadedFile(tmpPath, uploadsDir); procErr == nil && filename != "" {
+						imageURL = "/uploads/" + filename
+					}
+				}
+			}
+		}
+
 		// 验证目标是否存在
 		if targetID <= 0 {
 			c.JSON(http.StatusBadRequest, gin.H{"ok": false, "msg": "无效的目标"})
@@ -2061,14 +2079,14 @@ func CommentSubmit(db *sql.DB) gin.HandlerFunc {
 			return
 		}
 
-		result, err := db.Exec("INSERT INTO comments (target_type, target_id, author, author_avatar, content) VALUES (?,?,?,?,?)",
-			targetType, targetID, author, avatarURL, content)
+		result, err := db.Exec("INSERT INTO comments (target_type, target_id, author, author_avatar, content, image_url) VALUES (?,?,?,?,?,?)",
+			targetType, targetID, author, avatarURL, content, imageURL)
 		if err != nil {
 			c.JSON(http.StatusInternalServerError, gin.H{"ok": false, "msg": "保存失败"})
 			return
 		}
 		rowsAff, _ := result.RowsAffected()
-		c.JSON(http.StatusOK, gin.H{"ok": true, "msg": "评论成功", "rowsAffected": rowsAff, "author": author, "author_avatar": avatarURL})
+		c.JSON(http.StatusOK, gin.H{"ok": true, "msg": "评论成功", "rowsAffected": rowsAff, "author": author, "author_avatar": avatarURL, "image_url": imageURL})
 	}
 }
 

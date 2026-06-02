@@ -290,6 +290,13 @@
                                             <div class="relative">
                                                 <textarea class="input-glow moment-comment-input w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none bg-white resize-none pr-10" rows="3" placeholder="说点什么吧，支持表情哦~"></textarea>
                                                 <button type="button" onclick="toggleMomentEmoji(this)" class="absolute bottom-2 right-2 p-1 rounded-md hover:bg-gray-100 text-gray-400 hover:text-gray-600 text-base transition" title="表情">😀</button>
+                                                <label id="moment-image-btn-{{.ID}}" class="hidden absolute bottom-2 right-9 p-1 rounded-md hover:bg-gray-100 text-gray-400 hover:text-gray-600 text-base transition cursor-pointer" title="添加图片">📷
+                                                    <input type="file" name="image" accept="image/*" onchange="previewMomentImage(this,{{.ID}})" class="hidden">
+                                                </label>
+                                            </div>
+                                            <div id="moment-image-preview-{{.ID}}" class="hidden mt-2 relative inline-block">
+                                                <img id="moment-image-preview-img-{{.ID}}" src="" class="max-h-24 rounded-lg border border-gray-200">
+                                                <button type="button" onclick="clearMomentImage({{.ID}})" class="absolute -top-1.5 -right-1.5 w-5 h-5 bg-gray-700 text-white rounded-full text-xs flex items-center justify-center hover:bg-red-500 transition">&times;</button>
                                             </div>
                                         <!-- Emoji Picker -->
                                         <div class="moment-emoji-picker hidden mt-1 p-2 bg-white border border-gray-200 rounded-lg shadow-lg grid grid-cols-10 gap-1 max-h-36 overflow-y-auto">
@@ -549,6 +556,10 @@
                     if (authorRow) {
                         authorRow.classList.toggle('hidden', loggedIn);
                     }
+                    var imgBtn = document.getElementById('moment-image-btn-' + id);
+                    if (imgBtn) {
+                        imgBtn.classList.toggle('hidden', !loggedIn);
+                    }
                 });
                 var ta = box.querySelector('textarea');
                 if (ta) ta.focus();
@@ -558,6 +569,25 @@
         function toggleMomentEmoji(btn) {
             var picker = btn.closest('.bg-gray-50').querySelector('.moment-emoji-picker');
             if (picker) picker.classList.toggle('hidden');
+        }
+
+        function previewMomentImage(input, id) {
+            var preview = document.getElementById('moment-image-preview-' + id);
+            var img = document.getElementById('moment-image-preview-img-' + id);
+            if (input.files && input.files[0]) {
+                img.src = URL.createObjectURL(input.files[0]);
+                preview.classList.remove('hidden');
+            }
+        }
+        function clearMomentImage(id) {
+            var preview = document.getElementById('moment-image-preview-' + id);
+            var input = preview ? preview.parentElement.previousElementSibling.querySelector('input[type=file]') : null;
+            if (!input) {
+                var btn = document.getElementById('moment-image-btn-' + id);
+                if (btn) input = btn.querySelector('input[type=file]');
+            }
+            if (input) input.value = '';
+            if (preview) preview.classList.add('hidden');
         }
 
         function insertMomentEmoji(btn, emoji) {
@@ -576,23 +606,32 @@
             var content = textarea.value.trim();
             if (!content) return;
 
-            var formData = new URLSearchParams();
-            formData.append('target_type', 'moment');
-            formData.append('target_id', momentId);
-            formData.append('content', content);
+            var fd = new FormData();
+            fd.append('target_type', 'moment');
+            fd.append('target_id', momentId);
+            fd.append('content', content);
 
             // 未登录时附上昵称
             var authorInput = document.getElementById('comment-author-' + momentId);
             if (authorInput && !authorInput.closest('.hidden')) {
                 var author = authorInput.value.trim();
                 if (!author) { showToast('请输入昵称', 'error'); return; }
-                formData.append('author', author);
+                fd.append('author', author);
             }
 
+            // 登录用户附上图片
+            if (_authLoggedIn) {
+                var imgInput = document.querySelector('#moment-image-btn-' + momentId + ' input[type=file]');
+                if (imgInput && imgInput.files.length > 0) {
+                    fd.append('image', imgInput.files[0]);
+                }
+            }
+
+            btn.textContent = '提交中...';
+            btn.disabled = true;
             fetch('/api/comment', {
                 method: 'POST',
-                headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-                body: formData.toString()
+                body: fd
             })
             .then(function(res) { return res.json(); })
             .then(function(data) {
@@ -614,8 +653,9 @@
                     var commentEl = document.createElement('div');
                     commentEl.className = 'flex gap-3 p-3 bg-gray-50 rounded-xl';
                     commentEl.style.animation = 'fadeIn 0.3s ease';
+                    var imgHtml = data.image_url ? '<img src="' + data.image_url + '" class="mt-2 max-h-32 rounded-lg border border-gray-200">' : '';
                     commentEl.innerHTML = avatarHtml +
-                        '<div class="flex-1 min-w-0"><div class="flex items-center gap-2"><span class="text-sm font-semibold text-gray-900">' + authorName + '</span><span class="text-xs text-gray-400">' + timeStr + '</span></div><p class="text-sm text-gray-600 mt-1">' + content.replace(/</g, '&lt;').replace(/>/g, '&gt;') + '</p></div>';
+                        '<div class="flex-1 min-w-0"><div class="flex items-center gap-2"><span class="text-sm font-semibold text-gray-900">' + authorName + '</span><span class="text-xs text-gray-400">' + timeStr + '</span></div><p class="text-sm text-gray-600 mt-1">' + content.replace(/</g, '&lt;').replace(/>/g, '&gt;') + '</p>' + imgHtml + '</div>';
 
                     if (!commentList) {
                         commentList = document.createElement('div');
@@ -640,7 +680,11 @@
                     showToast(data.msg || '评论失败', 'error');
                 }
             })
-            .catch(function() { showToast('网络错误', 'error'); });
+            .catch(function() { showToast('网络错误', 'error'); })
+            .finally(function() {
+                btn.textContent = '提交评论';
+                btn.disabled = false;
+            });
         }
 
         function shareMoment(id) {
