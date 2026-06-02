@@ -1,6 +1,8 @@
 services:
   uniflow:
-    build: .
+    build:
+      context: .
+      dockerfile: Dockerfile.binary
     container_name: uniflow
     restart: unless-stopped
     ports:
