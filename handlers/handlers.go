@@ -596,11 +596,11 @@ func MomentsListHandler(db *sql.DB) gin.HandlerFunc {
 			}
 			commentMap := make(map[int64][]models.Comment)
 			ph, phArgs := buildInPlaceholders(momentIDs)
-			commentRows, err := db.Query("SELECT id, target_type, target_id, author, author_avatar, content, created_at, parent_id FROM comments WHERE target_type='moment' AND target_id IN ("+ph+") ORDER BY created_at ASC", phArgs...)
+			commentRows, err := db.Query("SELECT id, target_type, target_id, author, author_avatar, content, image_url, created_at, parent_id FROM comments WHERE target_type='moment' AND target_id IN ("+ph+") ORDER BY created_at ASC", phArgs...)
 			if err == nil {
 				for commentRows.Next() {
 					var cm models.Comment
-					scanLog(commentRows.Scan(&cm.ID, &cm.TargetType, &cm.TargetID, &cm.Author, &cm.AuthorAvatar, &cm.Content, &cm.CreatedAt, &cm.ParentID), "momentComments")
+					scanLog(commentRows.Scan(&cm.ID, &cm.TargetType, &cm.TargetID, &cm.Author, &cm.AuthorAvatar, &cm.Content, &cm.ImageURL, &cm.CreatedAt, &cm.ParentID), "momentComments")
 					commentMap[cm.TargetID] = append(commentMap[cm.TargetID], cm)
 				}
 				commentRows.Close()
