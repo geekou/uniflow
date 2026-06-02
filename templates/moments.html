@@ -621,9 +621,10 @@
                 fd.append('author', author);
             }
 
-            // 登录用户附上图片
-            if (_authLoggedIn) {
-                var imgInput = document.querySelector('#moment-image-btn-' + momentId + ' input[type=file]');
+            // 登录用户附上图片（通过按钮可见性判断，不依赖异步状态）
+            var imgBtn = document.getElementById('moment-image-btn-' + momentId);
+            if (imgBtn && !imgBtn.classList.contains('hidden')) {
+                var imgInput = imgBtn.querySelector('input[type=file]');
                 if (imgInput && imgInput.files.length > 0) {
                     fd.append('image', imgInput.files[0]);
                 }
