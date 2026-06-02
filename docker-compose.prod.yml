@@ -15,14 +15,14 @@ services:
     container_name: uniflow
     restart: unless-stopped
     ports:
-      - "8080:8080"
+      - "9090:9090"
     volumes:
       - ./data:/app/data
       - ./uploads:/app/uploads
       - ./backups:/app/backups
     environment:
       - GIN_MODE=release
-      - PORT=8080
+      - PORT=9090
       - DB_PATH=/app/data/uniflow.db
 
   # 可选：Watchtower 自动更新容器
