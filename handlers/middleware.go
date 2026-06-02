@@ -329,13 +329,11 @@ func CSRFMiddleware() gin.HandlerFunc {
 		checkSameOrigin := func(rawURL string) bool {
 			rawURL = strings.TrimPrefix(rawURL, "https://")
 			rawURL = strings.TrimPrefix(rawURL, "http://")
+			// 去掉路径，保留 host:port
 			if idx := strings.Index(rawURL, "/"); idx >= 0 {
 				rawURL = rawURL[:idx]
 			}
-			if idx := strings.Index(rawURL, ":"); idx >= 0 {
-				rawURL = rawURL[:idx]
-			}
-			return rawURL == host || strings.HasPrefix(rawURL, host)
+			return rawURL == host
 		}
 		if (origin != "" && !checkSameOrigin(origin)) || (referer != "" && !checkSameOrigin(referer)) {
 			c.JSON(http.StatusForbidden, gin.H{"ok": false, "msg": "CSRF 验证失败"})
