@@ -1,6 +1,6 @@
 services:
   uniflow:
-    image: geekou/uniflow:latest
+    image: geekoubb/uniflow:latest
     container_name: uniflow
     restart: unless-stopped
     ports:
