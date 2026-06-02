@@ -1,7 +1,7 @@
-# 生产环境 —— 拉取 GitHub Actions 预构建镜像，零编译
+# 本地开发 —— 从源码编译
 services:
   uniflow:
-    image: ghcr.io/geekou/uniflow:latest
+    build: .
     container_name: uniflow
     restart: unless-stopped
     ports:
@@ -11,6 +11,6 @@ services:
       - ./uploads:/app/uploads
       - ./backups:/app/backups
     environment:
-      - GIN_MODE=release
+      - GIN_MODE=debug
       - PORT=9090
       - DB_PATH=/app/data/uniflow.db
