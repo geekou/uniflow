@@ -757,6 +757,32 @@ func AdminMomentEditPost(db *sql.DB) gin.HandlerFunc {
 		var existingMedia string
 		db.QueryRow("SELECT media_urls FROM moments WHERE id = ?", id).Scan(&existingMedia)
 
+		// 处理要删除的现有媒体
+		deletedMedia := c.PostForm("deleted_media")
+		if deletedMedia != "" && existingMedia != "" {
+			deletedSet := make(map[string]bool)
+			for _, d := range strings.Split(deletedMedia, ",") {
+				d = strings.TrimSpace(d)
+				if d != "" {
+					deletedSet[d] = true
+				}
+			}
+			// 从 existingMedia 中移除删除的 URL
+			var kept []string
+			for _, m := range strings.Split(existingMedia, ",") {
+				m = strings.TrimSpace(m)
+				if !deletedSet[m] {
+					kept = append(kept, m)
+				} else {
+					// 从磁盘删除文件
+					projectRoot := getProjectRoot(c)
+					filePath := filepath.Join(projectRoot, m)
+					os.Remove(filePath)
+				}
+			}
+			existingMedia = strings.Join(kept, ",")
+		}
+
 		// 处理新上传的媒体文件
 		newMedia := ""
 		form, _ := c.MultipartForm()

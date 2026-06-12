@@ -50,16 +50,18 @@
                 {{if .Moment.MediaURLs}}
                 <div class="flex flex-wrap gap-2 mt-3" id="existing-media">
                     {{range $url := split .Moment.MediaURLs ","}}
-                    <div class="relative w-20 h-20 rounded-lg overflow-hidden bg-gray-100">
+                    <div class="relative w-20 h-20 rounded-lg overflow-hidden bg-gray-100 group existing-media-item" data-url="{{$url}}">
                         {{if isVideo $url}}
                         <video src="{{$url}}" class="w-full h-full object-contain" preload="metadata"></video>
                         {{else}}
                         <img src="{{$url}}" class="w-full h-full object-cover">
                         {{end}}
+                        <button type="button" onclick="removeExistingMedia(this)" class="absolute top-1 right-1 w-5 h-5 bg-red-500 text-white rounded-full text-[10px] flex items-center justify-center opacity-0 group-hover:opacity-100 transition" title="删除此媒体">&times;</button>
                     </div>
                     {{end}}
                 </div>
                 {{end}}
+                <input type="hidden" name="deleted_media" id="deleted-media-input" value="">
             </div>
         </div>
         <div class="flex justify-end">
@@ -123,6 +125,19 @@
         function removePreview(idx) {
             momentMediaFiles.splice(idx, 1);
             renderPreviews();
+        }
+
+        // 删除已有媒体（编辑模式）
+        function removeExistingMedia(btn) {
+            var item = btn.closest('.existing-media-item');
+            var url = item.getAttribute('data-url');
+            var input = document.getElementById('deleted-media-input');
+            var deleted = input.value ? input.value.split(',') : [];
+            if (deleted.indexOf(url) === -1) {
+                deleted.push(url);
+                input.value = deleted.join(',');
+            }
+            item.remove();
         }
 
         // 拦截表单提交：用 FormData 手工附加所有 momentMediaFiles，避免 input.files 只读导致丢文件
