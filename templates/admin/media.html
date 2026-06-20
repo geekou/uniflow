@@ -12,19 +12,18 @@
 
     <!-- Upload Area -->
     <div class="bg-white rounded-2xl p-6 shadow-xs border border-gray-100/50 mb-6">
-        <form method="POST" data-no-toast action="/admin/upload" enctype="multipart/form-data" class="border-2 border-dashed border-gray-200 rounded-xl p-8 text-center hover:border-indigo-300 transition cursor-pointer" id="upload-area">
-            <input type="file" name="file" multiple accept="{{if eq .Type "photos"}}image/*{{else}}video/*{{end}}" id="file-input" class="hidden" onchange="handleFiles(this)">
+        <div class="border-2 border-dashed border-gray-200 rounded-xl p-8 text-center hover:border-indigo-300 transition cursor-pointer" id="upload-area">
+            <input type="file" multiple accept="{{if eq .Type "photos"}}image/*{{else}}video/*{{end}}" id="file-input" class="hidden">
             <i class="fa-solid fa-cloud-arrow-up text-3xl text-gray-300 mb-3 block"></i>
             <p class="text-sm text-gray-500">点击或拖拽文件到此处上传</p>
             <p class="text-xs text-gray-400 mt-1">支持批量上传，图片超过 2MB 自动压缩</p>
-        </form>
+        </div>
     </div>
 
     <!-- File Grid -->
     <div class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4" id="media-grid">
         {{range .Files}}
         <div class="bg-white rounded-2xl shadow-xs border border-gray-100/50 overflow-hidden group relative media-item" data-name="{{.Name}}">
-            <!-- 选择复选框 -->
             <label class="absolute top-2 left-2 z-10 cursor-pointer select-none">
                 <input type="checkbox" class="media-check hidden" data-name="{{.Name}}" onchange="updateSelection()">
                 <span class="inline-flex items-center justify-center w-6 h-6 rounded-md border-2 border-white/70 bg-black/20 text-white text-xs opacity-0 group-hover:opacity-100 transition check-icon">
@@ -51,9 +50,21 @@
     {{if eq (len .Files) 0}}<div class="bg-white rounded-2xl p-12 shadow-xs border border-gray-100/50 text-center text-sm text-gray-400">暂无文件</div>{{end}}
 
     <script>
-        // 上传处理
         var uploadArea = document.getElementById('upload-area');
-        uploadArea.addEventListener('click', function() { document.getElementById('file-input').click(); });
+        var fileInput = document.getElementById('file-input');
+
+        // 点击上传区域
+        uploadArea.addEventListener('click', function(e) {
+            fileInput.click();
+        });
+
+        // 文件选择
+        fileInput.addEventListener('change', function() {
+            if (this.files.length > 0) {
+                uploadFiles(this.files);
+            }
+            this.value = '';
+        });
 
         // 拖拽上传
         uploadArea.addEventListener('dragover', function(e) {
@@ -75,30 +86,32 @@
             }
         });
 
-        function handleFiles(input) {
-            if (input.files.length > 0) {
-                uploadFiles(input.files);
-            }
-        }
-
         function uploadFiles(fileList) {
             var fd = new FormData();
             for (var i = 0; i < fileList.length; i++) {
                 fd.append('file', fileList[i]);
             }
-            var btn = document.querySelector('#upload-area');
-            btn.style.opacity = '0.5';
-            fetch('/admin/upload', { method: 'POST', body: fd, credentials: 'same-origin', headers: {'X-Requested-With': 'fetch'} })
-                    .then(function(r) {
-                        if (r.ok || r.redirected) {
-                            showToast('上传成功', 'success');
-                            setTimeout(function() { location.reload(); }, 600);
-                        } else {
-                            return r.json().then(function(d) { showToast(d.msg || '上传失败', 'error'); });
-                        }
-                    })
-                    .catch(function() { showToast('上传失败', 'error'); btn.style.opacity = '1'; });
-            }
+            uploadArea.style.opacity = '0.5';
+            fetch('/admin/upload', {
+                method: 'POST',
+                body: fd,
+                credentials: 'same-origin',
+                headers: { 'X-Requested-With': 'fetch' }
+            })
+            .then(function(r) { return r.json(); })
+            .then(function(data) {
+                uploadArea.style.opacity = '1';
+                if (data.ok) {
+                    showToast('上传成功', 'success');
+                    setTimeout(function() { location.reload(); }, 800);
+                } else {
+                    showToast(data.msg || '上传失败', 'error');
+                }
+            })
+            .catch(function() {
+                uploadArea.style.opacity = '1';
+                showToast('上传失败', 'error');
+            });
         }
 
         // 多选逻辑
@@ -126,7 +139,6 @@
                 batchBtn.classList.add('opacity-50', 'cursor-not-allowed');
             }
 
-            // 更新选中项的视觉状态
             document.querySelectorAll('.media-item').forEach(function(item) {
                 var cb = item.querySelector('.media-check');
                 var icon = item.querySelector('.check-icon');
@@ -159,7 +171,7 @@
             .then(function(data) {
                 if (data.ok) {
                     showToast('删除成功', 'success');
-                    setTimeout(function() { location.reload(); }, 600);
+                    setTimeout(function() { location.reload(); }, 800);
                 } else {
                     showToast(data.msg || '删除失败', 'error');
                 }
@@ -183,7 +195,7 @@
             .then(function(data) {
                 if (data.ok) {
                     showToast('成功删除 ' + data.deleted + ' 个文件', 'success');
-                    setTimeout(function() { location.reload(); }, 600);
+                    setTimeout(function() { location.reload(); }, 800);
                 } else {
                     showToast(data.msg || '删除失败', 'error');
                 }
