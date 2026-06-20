@@ -12,6 +12,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"sort"
 	"strconv"
 	"strings"
 	"time"
@@ -1117,8 +1118,16 @@ func AdminMedia(db *sql.DB) gin.HandlerFunc {
 				"Size":       utils.FormatFileSize(info.Size()),
 				"URL":        "/uploads/" + e.Name(),
 				"URLEncoded": url.QueryEscape(e.Name()),
+				"ModTime":    info.ModTime(),
 			})
 		}
+
+		// 按上传时间倒序（最新在前）
+		sort.Slice(files, func(i, j int) bool {
+			mi, _ := files[i]["ModTime"].(time.Time)
+			mj, _ := files[j]["ModTime"].(time.Time)
+			return mi.After(mj)
+		})
 
 		data["Files"] = files
 		c.HTML(http.StatusOK, "admin/media.html", data)
