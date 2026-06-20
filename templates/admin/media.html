@@ -88,14 +88,13 @@
             }
             var btn = document.querySelector('#upload-area');
             btn.style.opacity = '0.5';
-            fetch('/admin/upload', { method: 'POST', body: fd, credentials: 'same-origin' })
+            fetch('/admin/upload', { method: 'POST', body: fd, credentials: 'same-origin', headers: {'X-Requested-With': 'fetch'} })
                     .then(function(r) {
                         if (r.ok || r.redirected) {
                             showToast('上传成功', 'success');
                             setTimeout(function() { location.reload(); }, 600);
                         } else {
-                            showToast('上传失败', 'error');
-                            btn.style.opacity = '1';
+                            return r.json().then(function(d) { showToast(d.msg || '上传失败', 'error'); });
                         }
                     })
                     .catch(function() { showToast('上传失败', 'error'); btn.style.opacity = '1'; });

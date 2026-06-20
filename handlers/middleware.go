@@ -365,10 +365,15 @@ func CSRFMiddleware() gin.HandlerFunc {
 			c.Next()
 			return
 		}
+		// 带 X-Requested-With 的 fetch 请求天然防 CSRF，直接放行
+		if c.GetHeader("X-Requested-With") == "fetch" {
+			c.Next()
+			return
+		}
 		origin := c.Request.Header.Get("Origin")
 		referer := c.Request.Header.Get("Referer")
 		host := c.Request.Host
-		// 写操作必须携带 Origin 或 Referer，且同源
+		// 浏览器原生表单提交必须有 Origin 或 Referer
 		if origin == "" && referer == "" {
 			c.JSON(http.StatusForbidden, gin.H{"ok": false, "msg": "CSRF 验证失败：缺少 Origin/Referer"})
 			c.Abort()
@@ -377,7 +382,6 @@ func CSRFMiddleware() gin.HandlerFunc {
 		checkSameOrigin := func(rawURL string) bool {
 			rawURL = strings.TrimPrefix(rawURL, "https://")
 			rawURL = strings.TrimPrefix(rawURL, "http://")
-			// 去掉路径，保留 host:port
 			if idx := strings.Index(rawURL, "/"); idx >= 0 {
 				rawURL = rawURL[:idx]
 			}
