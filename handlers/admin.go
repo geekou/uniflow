@@ -1202,22 +1202,25 @@ func AdminUpload(db *sql.DB) gin.HandlerFunc {
 
 func deleteMediaFile(projectRoot, name string) error {
 	uploadsDir := filepath.Join(projectRoot, "uploads")
-	target := filepath.Join(uploadsDir, filepath.Base(name))
+	// 只取文件名部分，丢弃任何路径
+	baseName := filepath.Base(name)
+	target := filepath.Join(uploadsDir, baseName)
+	cleanTarget := filepath.Clean(target)
+	cleanUploads := filepath.Clean(uploadsDir)
 	// 确保最终路径仍在 uploads 目录内
-	if !strings.HasPrefix(filepath.Clean(target), filepath.Clean(uploadsDir)+string(os.PathSeparator)) {
+	if cleanTarget != cleanUploads && !strings.HasPrefix(cleanTarget, cleanUploads+string(os.PathSeparator)) {
 		return fmt.Errorf("非法路径")
 	}
-	return os.Remove(target)
+	return os.Remove(cleanTarget)
 }
 
 func AdminMediaDelete(db *sql.DB) gin.HandlerFunc {
 	return func(c *gin.Context) {
-		// 支持路径参数和 query parameter 两种方式
 		name := c.Param("name")
+		// Gin 已自动 URL 解码 :name 参数，不需要再手动 unescape
 		if name == "" {
 			name = c.Query("url")
 		}
-		name, _ = url.QueryUnescape(name)
 		if name == "" {
 			c.JSON(http.StatusBadRequest, gin.H{"ok": false, "msg": "缺少文件名"})
 			return
