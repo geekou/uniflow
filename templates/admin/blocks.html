@@ -297,6 +297,20 @@
             }
         });
 
+        // Confirm with custom callback (for batch operations)
+        function confirmActionWithCallback(msg, callback) {
+            document.getElementById('confirm-msg').textContent = msg;
+            var btn = document.getElementById('confirm-btn');
+            // Save old handler and replace
+            var newBtn = btn.cloneNode(true);
+            btn.parentNode.replaceChild(newBtn, btn);
+            newBtn.addEventListener('click', function() {
+                document.getElementById('confirm-modal').classList.add('hidden');
+                callback();
+            });
+            document.getElementById('confirm-modal').classList.remove('hidden');
+        }
+
         // Publish modal
         function openPublishModal() {
             document.getElementById('publish-modal').classList.remove('hidden');

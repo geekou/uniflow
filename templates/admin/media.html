@@ -161,46 +161,31 @@
 
         // 单个删除
         function singleDelete(name) {
-            if (!confirm('确定删除 ' + name + '？')) return;
-            fetch('/admin/media/delete/' + encodeURIComponent(name), {
-                method: 'POST',
-                headers: { 'X-Requested-With': 'fetch' },
-                credentials: 'same-origin'
-            })
-            .then(function(r) { return r.json(); })
-            .then(function(data) {
-                if (data.ok) {
-                    showToast('删除成功', 'success');
-                    setTimeout(function() { location.reload(); }, 800);
-                } else {
-                    showToast(data.msg || '删除失败', 'error');
-                }
-            })
-            .catch(function() { showToast('删除失败', 'error'); });
+            confirmAction('确定删除 ' + name + '？', '/admin/media/delete/' + encodeURIComponent(name));
         }
 
         // 批量删除
         function batchDelete() {
             var names = getChecked();
             if (names.length === 0) return;
-            if (!confirm('确定删除选中的 ' + names.length + ' 个文件？此操作不可恢复。')) return;
-
-            fetch('/admin/media/batch-delete', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json', 'X-Requested-With': 'fetch' },
-                credentials: 'same-origin',
-                body: JSON.stringify({ names: names })
-            })
-            .then(function(r) { return r.json(); })
-            .then(function(data) {
-                if (data.ok) {
-                    showToast('成功删除 ' + data.deleted + ' 个文件', 'success');
-                    setTimeout(function() { location.reload(); }, 800);
-                } else {
-                    showToast(data.msg || '删除失败', 'error');
-                }
-            })
-            .catch(function() { showToast('删除失败', 'error'); });
+            confirmActionWithCallback('确定删除选中的 ' + names.length + ' 个文件？此操作不可恢复。', function() {
+                fetch('/admin/media/batch-delete', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json', 'X-Requested-With': 'fetch' },
+                    credentials: 'same-origin',
+                    body: JSON.stringify({ names: names })
+                })
+                .then(function(r) { return r.json(); })
+                .then(function(data) {
+                    if (data.ok) {
+                        showToast('成功删除 ' + data.deleted + ' 个文件', 'success');
+                        setTimeout(function() { location.reload(); }, 800);
+                    } else {
+                        showToast(data.msg || '删除失败', 'error');
+                    }
+                })
+                .catch(function() { showToast('删除失败', 'error'); });
+            });
         }
     </script>
 {{template "admin_tail" .}}
