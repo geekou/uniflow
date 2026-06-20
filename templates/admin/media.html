@@ -52,16 +52,43 @@
 
     <script>
         // 上传处理
-        document.getElementById('upload-area').addEventListener('click', function() { document.getElementById('file-input').click(); });
+        var uploadArea = document.getElementById('upload-area');
+        uploadArea.addEventListener('click', function() { document.getElementById('file-input').click(); });
+
+        // 拖拽上传
+        uploadArea.addEventListener('dragover', function(e) {
+            e.preventDefault();
+            e.stopPropagation();
+            this.classList.add('border-indigo-400', 'bg-indigo-50');
+        });
+        uploadArea.addEventListener('dragleave', function(e) {
+            e.preventDefault();
+            e.stopPropagation();
+            this.classList.remove('border-indigo-400', 'bg-indigo-50');
+        });
+        uploadArea.addEventListener('drop', function(e) {
+            e.preventDefault();
+            e.stopPropagation();
+            this.classList.remove('border-indigo-400', 'bg-indigo-50');
+            if (e.dataTransfer.files.length > 0) {
+                uploadFiles(e.dataTransfer.files);
+            }
+        });
+
         function handleFiles(input) {
             if (input.files.length > 0) {
-                var fd = new FormData();
-                for (var i = 0; i < input.files.length; i++) {
-                    fd.append('file', input.files[i]);
-                }
-                var btn = document.querySelector('#upload-area');
-                btn.style.opacity = '0.5';
-                fetch('/admin/upload', { method: 'POST', body: fd, credentials: 'same-origin' })
+                uploadFiles(input.files);
+            }
+        }
+
+        function uploadFiles(fileList) {
+            var fd = new FormData();
+            for (var i = 0; i < fileList.length; i++) {
+                fd.append('file', fileList[i]);
+            }
+            var btn = document.querySelector('#upload-area');
+            btn.style.opacity = '0.5';
+            fetch('/admin/upload', { method: 'POST', body: fd, credentials: 'same-origin' })
                     .then(function(r) {
                         if (r.ok || r.redirected) {
                             showToast('上传成功', 'success');
