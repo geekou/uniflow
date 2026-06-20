@@ -11,6 +11,7 @@ import (
 	"strings"
 
 	"uniflow/models"
+	"uniflow/utils"
 
 	"github.com/gin-gonic/gin"
 )
@@ -946,12 +947,9 @@ func CustomPageHandler(db *sql.DB) gin.HandlerFunc {
 			return
 		}
 
-		// 如果 content 不包含 HTML 标签，将换行符转为 <br>
-		content := pv.HTMLContent
-		if strings.Index(string(content), "<") == -1 {
-			content = template.HTML(strings.ReplaceAll(string(content), "\n", "<br>"))
-		}
-		pv.HTMLContent = content
+	// 统一净化 HTML 内容，防止 XSS
+	content := template.HTML(utils.SanitizeHTML(string(pv.HTMLContent)))
+	pv.HTMLContent = content
 
 		c.HTML(http.StatusOK, "page.html", PageData{
 			SiteTitle:        settings["site_title"],

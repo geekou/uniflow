@@ -13,21 +13,15 @@ import (
 	"strings"
 	"time"
 
-	"github.com/microcosm-cc/bluemonday"
 	"uniflow/handlers"
 	"uniflow/models"
+	"uniflow/utils"
 
 	"github.com/gin-gonic/gin"
 )
 
 // Version 当前版本号
 const Version = "v1.0.1"
-
-// htmlSanitizer 使用 bluemonday UGCPolicy 过滤用户生成的 HTML（允许 Markdown 渲染后的常见标签）
-var htmlSanitizer = bluemonday.UGCPolicy().
-	AllowAttrs("class").OnElements("pre", "code", "span", "div", "table", "th", "td", "tr", "thead", "tbody").
-	AllowAttrs("id", "target").OnElements("h1", "h2", "h3", "h4", "h5", "h6").
-	AllowAttrs("style").OnElements("span")
 
 // stripHTML 移除 HTML 标签，用于字数统计
 func stripHTML(html string) string {
@@ -107,9 +101,16 @@ func main() {
 	gin.SetMode(mode)
 
 	r := gin.Default()
+	_ = r.SetTrustedProxies(nil) // 禁用代理头，防止 IP 伪造绕过限流
 
 	// ============ 中间件：安全响应头 ============
 	r.Use(handlers.SecurityHeadersMiddleware())
+
+	// ============ 中间件：全局请求体大小限制 ============
+	r.Use(func(c *gin.Context) {
+		c.Request.Body = http.MaxBytesReader(c.Writer, c.Request.Body, 500<<20)
+		c.Next()
+	})
 
 	// ============ 中间件：检查是否已初始化 ============
 	r.Use(handlers.SetupCheckMiddleware(models.DB))
@@ -190,8 +191,7 @@ func main() {
 			return m, nil
 		},
 		"safeHTML": func(s string) template.HTML {
-			sanitized := htmlSanitizer.Sanitize(s)
-			return template.HTML(sanitized)
+			return template.HTML(utils.SanitizeHTML(s))
 		},
 		"split":    func(s, sep string) []string { return strings.Split(s, sep) },
 		"isVideo":  func(s string) bool {

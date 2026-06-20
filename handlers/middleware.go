@@ -28,14 +28,20 @@ func SecurityHeadersMiddleware() gin.HandlerFunc {
 		c.Header("X-XSS-Protection", "1; mode=block")
 		c.Header("Referrer-Policy", "strict-origin-when-cross-origin")
 		c.Header("Permissions-Policy", "camera=(), microphone=(), geolocation=()")
+		c.Header("Content-Security-Policy", "default-src 'self'; script-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net https://cdnjs.cloudflare.com https://cdn.quilljs.com; style-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net https://cdnjs.cloudflare.com; img-src 'self' data: https:; media-src 'self'; connect-src 'self'")
 		c.Next()
 	}
 }
 
 // ============ 管理员会话管理 ============
 
+type sessionEntry struct {
+	username  string
+	createdAt time.Time
+}
+
 var (
-	sessionStore = make(map[string]string) // token -> username
+	sessionStore = make(map[string]sessionEntry) // token -> session
 	sessionMu    sync.RWMutex
 	hmacSecret   []byte
 )
@@ -43,19 +49,24 @@ var (
 func init() {
 	key := make([]byte, 32)
 	if _, err := rand.Read(key); err != nil {
-		log.Printf("[WARN] failed to generate HMAC key: %v, using fallback", err)
+		log.Fatalf("[FATAL] crypto/rand failed to generate HMAC key: %v", err)
 	}
 	hmacSecret = key
 }
 
 // setSessionCookie 设置带 SameSite=Strict 的会话 cookie
 func setSessionCookie(c *gin.Context, value string, maxAge int) {
+	secure := true
+	if c.Request.TLS == nil && (c.Request.Host == "localhost:9090" || strings.HasPrefix(c.Request.Host, "127.0.0.1") || strings.HasPrefix(c.Request.Host, "localhost")) {
+		secure = false // 本地开发允许 HTTP
+	}
 	http.SetCookie(c.Writer, &http.Cookie{
 		Name:     "uniflow_session",
 		Value:    value,
 		Path:     "/",
 		MaxAge:   maxAge,
 		HttpOnly: true,
+		Secure:   secure,
 		SameSite: http.SameSiteStrictMode,
 	})
 }
@@ -63,11 +74,14 @@ func setSessionCookie(c *gin.Context, value string, maxAge int) {
 // GenerateSession 创建管理员会话，返回 token
 func GenerateSession(username string) string {
 	token := make([]byte, 32)
-	rand.Read(token)
+	if _, err := rand.Read(token); err != nil {
+		log.Printf("[ERROR] crypto/rand failed for session token: %v", err)
+		return ""
+	}
 	tokenStr := hex.EncodeToString(token)
 
 	sessionMu.Lock()
-	sessionStore[tokenStr] = username
+	sessionStore[tokenStr] = sessionEntry{username: username, createdAt: time.Now()}
 	sessionMu.Unlock()
 
 	return tokenStr
@@ -77,8 +91,15 @@ func GenerateSession(username string) string {
 func ValidateSession(token string) (string, bool) {
 	sessionMu.RLock()
 	defer sessionMu.RUnlock()
-	username, ok := sessionStore[token]
-	return username, ok
+	e, ok := sessionStore[token]
+	if !ok {
+		return "", false
+	}
+	// 会话超过 7 天自动过期
+	if time.Since(e.createdAt) > 7*24*time.Hour {
+		return "", false
+	}
+	return e.username, true
 }
 
 // RevokeSession 撤销会话

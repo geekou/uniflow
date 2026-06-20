@@ -196,7 +196,7 @@ func sanitizeFilename(name string) string {
 // allowedMimeTypes 允许上传的文件 MIME 类型
 var allowedMimeTypes = map[string]bool{
 	"image/jpeg": true, "image/png": true, "image/gif": true,
-	"image/webp": true, "image/svg+xml": true,
+	"image/webp": true,
 	"video/mp4": true, "video/webm": true,
 }
 
