@@ -15,6 +15,7 @@ import (
 	"strconv"
 	"strings"
 	"time"
+	"unicode"
 
 	"github.com/gin-gonic/gin"
 	"golang.org/x/crypto/bcrypt"
@@ -64,15 +65,33 @@ func AdminLoginGet(c *gin.Context) {
 }
 
 func AdminLoginPost(db *sql.DB) gin.HandlerFunc {
+	// 预生成假 hash 用于时序攻击防护
+	fakeHash, _ := bcrypt.GenerateFromPassword([]byte("dummy"), bcrypt.DefaultCost)
+
 	return func(c *gin.Context) {
 		username := c.PostForm("username")
 		password := c.PostForm("password")
+		ip := getClientIP(c)
 
 		var user models.User
 		err := db.QueryRow("SELECT id, username, password, role FROM users WHERE username = ?", username).
 			Scan(&user.ID, &user.Username, &user.Password, &user.Role)
 
-		if err != nil || bcrypt.CompareHashAndPassword([]byte(user.Password), []byte(password)) != nil {
+		if err != nil {
+			// 用户不存在时也跑 bcrypt 抹平时序差异
+			bcrypt.CompareHashAndPassword(fakeHash, []byte(password))
+			db.Exec("INSERT INTO logs (log_type, operator, action, ip, user_agent, result) VALUES ('login', ?, ?, ?, ?, 'failure')",
+				username, "login", ip, c.Request.UserAgent())
+			c.HTML(http.StatusOK, "admin/login.html", gin.H{
+				"SiteTitle": "UniFlow",
+				"Error":     "用户名或密码错误",
+			})
+			return
+		}
+
+		if bcrypt.CompareHashAndPassword([]byte(user.Password), []byte(password)) != nil {
+			db.Exec("INSERT INTO logs (log_type, operator, action, ip, user_agent, result) VALUES ('login', ?, ?, ?, ?, 'failure')",
+				username, "login", ip, c.Request.UserAgent())
 			c.HTML(http.StatusOK, "admin/login.html", gin.H{
 				"SiteTitle": "UniFlow",
 				"Error":     "用户名或密码错误",
@@ -81,7 +100,6 @@ func AdminLoginPost(db *sql.DB) gin.HandlerFunc {
 		}
 
 		// 记录登录日志
-		ip := getClientIP(c)
 		db.Exec("INSERT INTO logs (log_type, operator, action, ip, user_agent, result) VALUES ('login', ?, ?, ?, ?, 'success')",
 			username, "login", ip, c.Request.UserAgent())
 
@@ -132,6 +150,12 @@ func AdminPostList(db *sql.DB) gin.HandlerFunc {
 		data := adminData("文章列表", "posts", "list", getAdminUsername(c), db)
 		data["Mode"] = "list"
 
+		// 搜索和筛选
+		searchQuery := strings.TrimSpace(c.Query("q"))
+		filterStatus := strings.TrimSpace(c.Query("status"))
+		data["SearchQuery"] = searchQuery
+		data["FilterStatus"] = filterStatus
+
 		page, _ := strconv.Atoi(c.DefaultQuery("page", "1"))
 		if page < 1 {
 			page = 1
@@ -139,12 +163,25 @@ func AdminPostList(db *sql.DB) gin.HandlerFunc {
 		pageSize := 15
 		offset := (page - 1) * pageSize
 
-		var total int
-		db.QueryRow("SELECT COUNT(*) FROM posts").Scan(&total)
+		// 构建 WHERE 条件
+		where := "WHERE 1=1"
+		var args []interface{}
+		if searchQuery != "" {
+			where += " AND p.title LIKE ?"
+			args = append(args, "%"+searchQuery+"%")
+		}
+		if filterStatus != "" {
+			where += " AND p.status = ?"
+			args = append(args, filterStatus)
+		}
 
+		var total int
+		db.QueryRow("SELECT COUNT(*) FROM posts p "+where, args...).Scan(&total)
+
+		queryArgs := append(args, pageSize, offset)
 		rows, _ := db.Query(
-			"SELECT p.id, p.title, p.status, p.views, p.created_at, c.name FROM posts p LEFT JOIN categories c ON p.category_id = c.id ORDER BY p.id DESC LIMIT ? OFFSET ?",
-			pageSize, offset,
+			"SELECT p.id, p.title, p.status, p.views, p.created_at, c.name FROM posts p LEFT JOIN categories c ON p.category_id = c.id "+where+" ORDER BY p.id DESC LIMIT ? OFFSET ?",
+			queryArgs...,
 		)
 		var posts []gin.H
 		if rows != nil {
@@ -199,12 +236,22 @@ func AdminPostCreate(db *sql.DB) gin.HandlerFunc {
 
 func AdminPostCreatePost(db *sql.DB) gin.HandlerFunc {
 	return func(c *gin.Context) {
-		title := c.PostForm("title")
+		title := strings.TrimSpace(c.PostForm("title"))
 		content := c.PostForm("content")
+		if title == "" {
+			c.JSON(http.StatusBadRequest, gin.H{"ok": false, "msg": "标题不能为空"})
+			return
+		}
 		categoryID, _ := strconv.ParseInt(c.PostForm("category_id"), 10, 64)
 		isTop, _ := strconv.Atoi(c.PostForm("is_top"))
 		privacy := c.PostForm("privacy")
+		if privacy != "public" && privacy != "private" {
+			privacy = "public"
+		}
 		status := c.PostForm("status")
+		if status != "published" && status != "draft" && status != "scheduled" {
+			status = "draft"
+		}
 		publishAt := c.PostForm("publish_at")
 
 		// 定时发布：如果 publish_at 有值且在未来，强制 status=scheduled
@@ -438,7 +485,10 @@ func AdminPostExport(db *sql.DB) gin.HandlerFunc {
 		}
 		// 生成文件名：标题.md，去除不安全字符
 		safeName := strings.Map(func(r rune) rune {
-			if r == '/' || r == '\\' || r == ':' || r == '*' || r == '?' || r == '"' || r == '<' || r == '>' || r == '|' {
+			if r == '/' || r == '\\' || r == ':' || r == '*' || r == '?' || r == '"' || r == '<' || r == '>' || r == '|' || r == '\n' || r == '\r' {
+				return '_'
+			}
+			if unicode.IsControl(r) {
 				return '_'
 			}
 			return r
@@ -539,11 +589,16 @@ func AdminCategorySave(db *sql.DB) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		name := c.PostForm("name")
 		slug := c.PostForm("slug")
-		editID := c.PostForm("edit_id")
+		editIDStr := c.PostForm("edit_id")
 
-		if editID != "" {
+		if editIDStr != "" {
+			editID, err := strconv.ParseInt(editIDStr, 10, 64)
+			if err != nil || editID <= 0 {
+				c.JSON(http.StatusBadRequest, gin.H{"ok": false, "msg": "非法的分类ID"})
+				return
+			}
 			if _, err := db.Exec("UPDATE categories SET name=?, slug=? WHERE id=?", name, slug, editID); err != nil {
-				log.Printf("[Admin] update category %s failed: %v", editID, err)
+				log.Printf("[Admin] update category %d failed: %v", editID, err)
 			}
 			logOperation(db, getAdminUsername(c), c, fmt.Sprintf("编辑分类: %s", name))
 		} else {
@@ -894,6 +949,7 @@ func AdminComments(db *sql.DB) gin.HandlerFunc {
 			rows.Close()
 		}
 		data["Comments"] = comments
+		data["Total"] = len(comments)
 		c.HTML(http.StatusOK, "admin/comment.html", data)
 	}
 }
@@ -1209,7 +1265,7 @@ func AdminSettingsPost(db *sql.DB) gin.HandlerFunc {
 		keys := []string{"site_title", "site_subtitle", "sensitive_words", "comment_limit_count", "comment_limit_minute", "site_founded_at", "site_notification"}
 		for _, key := range keys {
 			value := c.PostForm(key)
-			execLog(db, "INSERT OR REPLACE INTO system_settings (key, value) VALUES (?, ?)", key, value)
+			execLog(db, "INSERT INTO system_settings (key, value) VALUES (?, ?) ON CONFLICT(key) DO UPDATE SET value=excluded.value", key, value)
 		}
 
 		// 处理 Banner 上传
@@ -1242,7 +1298,7 @@ func AdminSettingsPost(db *sql.DB) gin.HandlerFunc {
 			log.Printf("[Banner] no file uploaded or error: %v", err)
 		}
 		log.Printf("[Banner] saving banner_url=%q", bannerURL)
-		execLog(db, "INSERT OR REPLACE INTO system_settings (key, value) VALUES ('banner_url', ?)", bannerURL)
+		execLog(db, "INSERT INTO system_settings (key, value) VALUES ('banner_url', ?) ON CONFLICT(key) DO UPDATE SET value=excluded.value", bannerURL)
 
 		// Process QR code uploads
 		qrFields := []struct {
@@ -1277,7 +1333,7 @@ func AdminSettingsPost(db *sql.DB) gin.HandlerFunc {
 					}
 				}
 			}
-			execLog(db, "INSERT OR REPLACE INTO system_settings (key, value) VALUES (?, ?)", qf.dbKey, qrURL)
+			execLog(db, "INSERT INTO system_settings (key, value) VALUES (?, ?) ON CONFLICT(key) DO UPDATE SET value=excluded.value", qf.dbKey, qrURL)
 		}
 
 		logOperation(db, getAdminUsername(c), c, "更新网站设置")
@@ -1406,7 +1462,7 @@ func AdminAboutPost(db *sql.DB) gin.HandlerFunc {
 		}
 
 		jsonBytes, _ := json.Marshal(am)
-		execLog(db, "INSERT OR REPLACE INTO system_settings (key, value) VALUES ('about_me_json', ?)", string(jsonBytes))
+		execLog(db, "INSERT INTO system_settings (key, value) VALUES ('about_me_json', ?) ON CONFLICT(key) DO UPDATE SET value=excluded.value", string(jsonBytes))
 
 		logOperation(db, getAdminUsername(c), c, "更新关于")
 		c.Redirect(http.StatusFound, "/admin/about")
@@ -1487,9 +1543,14 @@ func AdminUserSave(db *sql.DB) gin.HandlerFunc {
 			return
 		}
 
-		if _, err := db.Exec("INSERT OR IGNORE INTO users (username, password, role) VALUES (?, ?, ?)", username, string(hash), role); err != nil {
+		result, err := db.Exec("INSERT INTO users (username, password, role) VALUES (?, ?, ?)", username, string(hash), role)
+		if err != nil {
 			log.Printf("[AdminUserCreate] error: %v", err)
-			c.JSON(http.StatusInternalServerError, gin.H{"ok": false, "msg": "创建失败"})
+			c.JSON(http.StatusConflict, gin.H{"ok": false, "msg": "用户名已存在"})
+			return
+		}
+		if rows, _ := result.RowsAffected(); rows == 0 {
+			c.JSON(http.StatusConflict, gin.H{"ok": false, "msg": "用户名已存在"})
 			return
 		}
 		logOperation(db, getAdminUsername(c), c, fmt.Sprintf("新增用户: %s", username))
@@ -1582,9 +1643,36 @@ func AdminUserDelete(db *sql.DB) gin.HandlerFunc {
 			c.JSON(http.StatusBadRequest, gin.H{"ok": false, "msg": "非法ID"})
 			return
 		}
+		// 禁止删除 id=1 的超级管理员
+		if id == 1 {
+			c.JSON(http.StatusForbidden, gin.H{"ok": false, "msg": "不能删除超级管理员"})
+			return
+		}
+		// 禁止删除自己
+		currentUsername := getAdminUsername(c)
+		var currentID int64
+		db.QueryRow("SELECT id FROM users WHERE username = ?", currentUsername).Scan(&currentID)
+		if id == currentID {
+			c.JSON(http.StatusForbidden, gin.H{"ok": false, "msg": "不能删除自己"})
+			return
+		}
+		// 禁止删除最后一个 admin
+		var adminCount int
+		db.QueryRow("SELECT COUNT(*) FROM users WHERE role = 'admin'").Scan(&adminCount)
+		if adminCount <= 1 {
+			var targetRole string
+			db.QueryRow("SELECT role FROM users WHERE id = ?", id).Scan(&targetRole)
+			if targetRole == "admin" {
+				c.JSON(http.StatusForbidden, gin.H{"ok": false, "msg": "不能删除最后一个管理员"})
+				return
+			}
+		}
 		if _, err := db.Exec("DELETE FROM users WHERE id = ?", id); err != nil {
 			log.Printf("[AdminUserDelete] error: %v", err)
+			c.JSON(http.StatusInternalServerError, gin.H{"ok": false, "msg": "删除失败"})
+			return
 		}
+		logOperation(db, currentUsername, c, fmt.Sprintf("删除用户 id=%d", id))
 		c.JSON(http.StatusOK, gin.H{"ok": true})
 	}
 }
@@ -2144,6 +2232,13 @@ func PostLikeHandler(db *sql.DB) gin.HandlerFunc {
 			c.JSON(http.StatusBadRequest, gin.H{"ok": false})
 			return
 		}
+		// 校验文章存在且已发布
+		var exists int
+		db.QueryRow("SELECT 1 FROM posts WHERE id = ? AND status = 'published'", id).Scan(&exists)
+		if exists == 0 {
+			c.JSON(http.StatusNotFound, gin.H{"ok": false, "msg": "文章不存在"})
+			return
+		}
 		db.Exec("UPDATE posts SET like_count = like_count + 1 WHERE id = ?", id)
 		var count int64
 		db.QueryRow("SELECT like_count FROM posts WHERE id = ?", id).Scan(&count)
@@ -2157,6 +2252,12 @@ func PostDislikeHandler(db *sql.DB) gin.HandlerFunc {
 		id, err := strconv.ParseInt(c.Param("id"), 10, 64)
 		if err != nil || id <= 0 {
 			c.JSON(http.StatusBadRequest, gin.H{"ok": false})
+			return
+		}
+		var exists int
+		db.QueryRow("SELECT 1 FROM posts WHERE id = ? AND status = 'published'", id).Scan(&exists)
+		if exists == 0 {
+			c.JSON(http.StatusNotFound, gin.H{"ok": false, "msg": "文章不存在"})
 			return
 		}
 		db.Exec("UPDATE posts SET dislike_count = dislike_count + 1 WHERE id = ?", id)
@@ -2238,7 +2339,7 @@ func SetupPost(db *sql.DB) gin.HandlerFunc {
 		db.Exec("INSERT INTO users (username, password, role) VALUES (?, ?, 'admin')", username, string(hash))
 
 		// 设置站点名称
-		db.Exec("INSERT OR REPLACE INTO system_settings (key, value) VALUES ('site_title', ?)", siteTitle)
+		db.Exec("INSERT INTO system_settings (key, value) VALUES ('site_title', ?) ON CONFLICT(key) DO UPDATE SET value=excluded.value", siteTitle)
 
 		// 设置关于我昵称
 		aboutJSON, _ := json.Marshal(map[string]string{
@@ -2250,7 +2351,7 @@ func SetupPost(db *sql.DB) gin.HandlerFunc {
 			"twitter":  "",
 			"email":    "",
 		})
-		db.Exec("INSERT OR REPLACE INTO system_settings (key, value) VALUES ('about_me_json', ?)", string(aboutJSON))
+		db.Exec("INSERT INTO system_settings (key, value) VALUES ('about_me_json', ?) ON CONFLICT(key) DO UPDATE SET value=excluded.value", string(aboutJSON))
 
 		// 自动登录
 		sessionToken := GenerateSession(username)
@@ -2266,7 +2367,9 @@ func SetupPost(db *sql.DB) gin.HandlerFunc {
 func AdminCheckUpdate(currentVersion string) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		client := &http.Client{Timeout: 10 * time.Second}
-		resp, err := client.Get("https://api.github.com/repos/geekou/uniflow/releases/latest")
+		req, _ := http.NewRequest("GET", "https://api.github.com/repos/geekou/uniflow/releases/latest", nil)
+		req.Header.Set("User-Agent", "UniFlow/"+currentVersion)
+		resp, err := client.Do(req)
 		if err != nil {
 			c.JSON(http.StatusOK, gin.H{"ok": true, "current": currentVersion, "latest": "", "hasUpdate": false, "error": "无法连接 GitHub，请稍后重试"})
 			return

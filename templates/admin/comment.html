@@ -1,7 +1,7 @@
 {{template "admin_head" .}}
     <div class="flex items-center justify-between mb-6">
         <h2 class="text-lg font-bold">评论管理</h2>
-        <span class="text-xs text-gray-400">共 {{.Total}} 条评论</span>
+        <span class="text-xs text-gray-400">共 {{if .Total}}{{.Total}}{{else}}0{{end}} 条评论</span>
     </div>
 
     <div class="bg-white rounded-2xl shadow-xs border border-gray-100/50 overflow-hidden">

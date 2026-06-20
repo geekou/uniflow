@@ -77,8 +77,11 @@ func splitWords(s string) []string {
 
 func main() {
 	// 设置时区为中国标准时间
-	loc, _ := time.LoadLocation("Asia/Shanghai")
-	time.Local = loc
+	if loc, err := time.LoadLocation("Asia/Shanghai"); err == nil {
+		time.Local = loc
+	} else {
+		log.Printf("[WARN] load Asia/Shanghai timezone failed: %v, using UTC", err)
+	}
 
 	// 获取项目根目录
 	projectRoot, err := os.Getwd()
@@ -339,10 +342,12 @@ func main() {
 	api.Use(handlers.RateLimitMiddleware(db))
 	api.Use(handlers.SensitiveWordFilter(db))
 	{
-		api.POST("/comment", handlers.CommentSubmit(db))
+	api.POST("/comment", handlers.CommentSubmit(db))
 		api.POST("/guestbook", handlers.GuestbookSubmit(db))
-		api.POST("/moment/like/:id", handlers.MomentLikeHandler(db))
 	}
+
+	// 瞬间点赞（不限流，避免误伤正常用户）
+	r.POST("/api/moment/like/:id", handlers.MomentLikeHandler(db))
 
 	// ===============================================
 	//   后台管理路由
@@ -406,38 +411,39 @@ func main() {
 		auth.POST("/media/delete/:name", handlers.AdminMediaDelete(db))
 		auth.POST("/media/batch-delete", handlers.AdminMediaBatchDelete(db))
 
-		// 网站设置
-		auth.GET("/settings", handlers.AdminSettings(db))
-		auth.POST("/settings", handlers.AdminSettingsPost(db))
-		auth.GET("/about", handlers.AdminAbout(db))
-		auth.POST("/about", handlers.AdminAboutPost(db))
-		auth.GET("/sitemap", handlers.AdminSitemap(db))
+		// 网站设置（仅 admin）
+		adminOnly := auth.Group("", handlers.RequireAdminMiddleware())
+		adminOnly.GET("/settings", handlers.AdminSettings(db))
+		adminOnly.POST("/settings", handlers.AdminSettingsPost(db))
+		adminOnly.GET("/about", handlers.AdminAbout(db))
+		adminOnly.POST("/about", handlers.AdminAboutPost(db))
+		adminOnly.GET("/sitemap", handlers.AdminSitemap(db))
 
-		// 系统管理
-		auth.GET("/users", handlers.AdminUsers(db))
-		auth.POST("/users/save", handlers.AdminUserSave(db))
-		auth.POST("/users/update/:id", handlers.AdminUserUpdate(db))
-		auth.POST("/users/delete/:id", handlers.AdminUserDelete(db))
-		auth.POST("/users/reset-password/:id", handlers.AdminUserResetPassword(db))
+		// 系统管理（仅 admin）
+		adminOnly.GET("/users", handlers.AdminUsers(db))
+		adminOnly.POST("/users/save", handlers.AdminUserSave(db))
+		adminOnly.POST("/users/update/:id", handlers.AdminUserUpdate(db))
+		adminOnly.POST("/users/delete/:id", handlers.AdminUserDelete(db))
+		adminOnly.POST("/users/reset-password/:id", handlers.AdminUserResetPassword(db))
 
-		auth.GET("/menus", handlers.AdminMenus(db))
-		auth.POST("/menus/save", handlers.AdminMenuSave(db))
-		auth.POST("/menus/delete/:id", handlers.AdminMenuDelete(db))
+		adminOnly.GET("/menus", handlers.AdminMenus(db))
+		adminOnly.POST("/menus/save", handlers.AdminMenuSave(db))
+		adminOnly.POST("/menus/delete/:id", handlers.AdminMenuDelete(db))
 
-		auth.GET("/pages", handlers.AdminPages(db))
-		auth.GET("/pages/create", handlers.AdminPageCreate(db))
-		auth.POST("/pages/create", handlers.AdminPageCreatePost(db))
-		auth.GET("/pages/edit/:id", handlers.AdminPageEdit(db))
-		auth.POST("/pages/edit/:id", handlers.AdminPageEditPost(db))
-		auth.POST("/pages/delete/:id", handlers.AdminPageDelete(db))
+		adminOnly.GET("/pages", handlers.AdminPages(db))
+		adminOnly.GET("/pages/create", handlers.AdminPageCreate(db))
+		adminOnly.POST("/pages/create", handlers.AdminPageCreatePost(db))
+		adminOnly.GET("/pages/edit/:id", handlers.AdminPageEdit(db))
+		adminOnly.POST("/pages/edit/:id", handlers.AdminPageEditPost(db))
+		adminOnly.POST("/pages/delete/:id", handlers.AdminPageDelete(db))
 
-		auth.GET("/backup", handlers.AdminBackup(db))
-		auth.POST("/backup/create", handlers.AdminBackupCreate(db))
-		auth.POST("/backup/restore/:name", handlers.AdminBackupRestore(db))
-		auth.POST("/backup/delete/:name", handlers.AdminBackupDelete(db))
-		auth.GET("/backup/download/:name", handlers.AdminBackupDownload(db))
+		adminOnly.GET("/backup", handlers.AdminBackup(db))
+		adminOnly.POST("/backup/create", handlers.AdminBackupCreate(db))
+		adminOnly.POST("/backup/restore/:name", handlers.AdminBackupRestore(db))
+		adminOnly.POST("/backup/delete/:name", handlers.AdminBackupDelete(db))
+		adminOnly.GET("/backup/download/:name", handlers.AdminBackupDownload(db))
 
-		auth.GET("/logs", handlers.AdminLogs(db))
+		adminOnly.GET("/logs", handlers.AdminLogs(db))
 	}
 
 	// ===============================================
@@ -520,7 +526,7 @@ func main() {
 	log.Printf("========================================")
 	log.Printf("  UniFlow is running at http://localhost:%s", port)
 	log.Printf("  Admin panel:  http://localhost:%s/admin", port)
-	log.Printf("  Default login: admin / admin123")
+	log.Printf("  Setup: http://localhost:%s/setup", port)
 	log.Printf("  Project root: %s", projectRoot)
 	log.Printf("========================================")
 

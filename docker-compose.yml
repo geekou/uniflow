@@ -9,6 +9,7 @@ services:
       - ./data:/app/data
       - ./uploads:/app/uploads
       - ./backups:/app/backups
+      - ./static:/app/static
     environment:
       - GIN_MODE=release
       - PORT=9090

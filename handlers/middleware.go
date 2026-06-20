@@ -7,12 +7,15 @@ import (
 	"database/sql"
 	"encoding/hex"
 	"fmt"
+	"log"
 	"net/http"
 	"strings"
 	"sync"
 	"time"
 
 	"github.com/gin-gonic/gin"
+
+	"uniflow/models"
 )
 
 // ============ 安全响应头中间件 ============
@@ -39,7 +42,9 @@ var (
 
 func init() {
 	key := make([]byte, 32)
-	rand.Read(key)
+	if _, err := rand.Read(key); err != nil {
+		log.Printf("[WARN] failed to generate HMAC key: %v, using fallback", err)
+	}
 	hmacSecret = key
 }
 
@@ -131,6 +136,25 @@ func AuthMiddleware() gin.HandlerFunc {
 		}
 
 		c.Set("admin_username", username)
+
+		// 查询用户角色
+		var role string
+		models.DB.QueryRow("SELECT role FROM users WHERE username = ?", username).Scan(&role)
+		c.Set("admin_role", role)
+
+		c.Next()
+	}
+}
+
+// RequireAdminMiddleware 要求 admin 角色才能访问
+func RequireAdminMiddleware() gin.HandlerFunc {
+	return func(c *gin.Context) {
+		role, exists := c.Get("admin_role")
+		if !exists || role != "admin" {
+			c.JSON(http.StatusForbidden, gin.H{"ok": false, "msg": "需要管理员权限"})
+			c.Abort()
+			return
+		}
 		c.Next()
 	}
 }
@@ -258,7 +282,8 @@ func getSensitiveWords(db *sql.DB) []string {
 	db.QueryRow("SELECT value FROM system_settings WHERE key='sensitive_words'").Scan(&words)
 	var result []string
 	if words != "" {
-		for _, w := range strings.Split(words, ",") {
+		// 支持逗号和换行分隔
+		for _, w := range strings.FieldsFunc(words, func(r rune) bool { return r == ',' || r == '\n' || r == '\r' }) {
 			w = strings.TrimSpace(w)
 			if w != "" {
 				result = append(result, w)
@@ -322,8 +347,10 @@ func CSRFMiddleware() gin.HandlerFunc {
 		origin := c.Request.Header.Get("Origin")
 		referer := c.Request.Header.Get("Referer")
 		host := c.Request.Host
+		// 写操作必须携带 Origin 或 Referer，且同源
 		if origin == "" && referer == "" {
-			c.Next()
+			c.JSON(http.StatusForbidden, gin.H{"ok": false, "msg": "CSRF 验证失败：缺少 Origin/Referer"})
+			c.Abort()
 			return
 		}
 		checkSameOrigin := func(rawURL string) bool {

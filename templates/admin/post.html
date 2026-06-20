@@ -18,7 +18,7 @@
                 <i class="fa-solid fa-magnifying-glass text-gray-400 text-xs mr-2"></i>
                 <input type="text" name="q" placeholder="搜索文章标题..." value="{{.SearchQuery}}" class="bg-transparent text-sm flex-1 outline-none placeholder-gray-400">
             </form>
-            <select onchange="location.href='/admin/posts?status='+this.value" class="border border-gray-200 rounded-xl px-3 py-2 text-xs outline-none">
+            <select onchange="location.href='/admin/posts?status='+this.value{{if .SearchQuery}}+'&q={{.SearchQuery}}'{{end}}" class="border border-gray-200 rounded-xl px-3 py-2 text-xs outline-none">
                 <option value="">全部状态</option>
                 <option value="published" {{if eq .FilterStatus "published"}}selected{{end}}>已发布</option>
                 <option value="draft" {{if eq .FilterStatus "draft"}}selected{{end}}>草稿</option>

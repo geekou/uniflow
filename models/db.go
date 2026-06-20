@@ -7,8 +7,6 @@ import (
 	"time"
 
 	_ "modernc.org/sqlite"
-
-	"golang.org/x/crypto/bcrypt"
 )
 
 var DB *sql.DB
@@ -489,24 +487,5 @@ func seedSystemSettings() error {
 	}
 
 	log.Println("[DB] System settings seeded with defaults")
-	return nil
-}
-
-// seedAdminUser 预设默认管理员（admin / admin123）
-func seedAdminUser() error {
-	hash, err := bcrypt.GenerateFromPassword([]byte("admin123"), bcrypt.DefaultCost)
-	if err != nil {
-		return fmt.Errorf("bcrypt hash failed: %w", err)
-	}
-
-	_, err = DB.Exec(
-		`INSERT OR IGNORE INTO users (username, password, role) VALUES (?, ?, 'admin')`,
-		"admin", string(hash),
-	)
-	if err != nil {
-		return fmt.Errorf("seed admin failed: %w", err)
-	}
-
-	log.Println("[DB] Default admin user seeded (admin/admin123)")
 	return nil
 }
