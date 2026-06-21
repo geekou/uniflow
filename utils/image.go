@@ -175,7 +175,7 @@ func SaveUploadedFile(srcPath, uploadsDir string) (string, error) {
 
 // sanitizeFilename 净化文件名，去除逗号、&、=、?、# 等 URL 特殊字符和中文/特殊 Unicode 字符
 // 保留字母、数字、下划线、连字符、点号
-var filenameSanitizeRe = regexp.MustCompile(`[^a-zA-Z0-9_\-./]`)
+var filenameSanitizeRe = regexp.MustCompile(`[^a-zA-Z0-9_\-.]`)
 
 func sanitizeFilename(name string) string {
 	// 替换 URL 特殊字符为下划线
@@ -197,7 +197,7 @@ func sanitizeFilename(name string) string {
 var allowedMimeTypes = map[string]bool{
 	"image/jpeg": true, "image/png": true, "image/gif": true,
 	"image/webp": true,
-	"video/mp4": true, "video/webm": true,
+	"video/mp4":  true, "video/webm": true,
 }
 
 // validateFileType 读取文件头检测 MIME 类型并校验

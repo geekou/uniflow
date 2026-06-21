@@ -123,7 +123,7 @@ function submitEditUser() {
     fd.append('role', role);
     var file = document.getElementById('edit-avatar-file').files[0];
     if (file) fd.append('avatar_file', file);
-    fetch('/admin/users/update/' + id, { method: 'POST', body: fd })
+    fetch('/admin/users/update/' + id, { method: 'POST', body: fd, credentials: 'same-origin', headers: {'X-Requested-With': 'fetch'} })
     .then(r => r.json()).then(d => {
         if (d.ok) { closeEditUser(); showToast('用户信息已更新'); setTimeout(function(){ location.reload(); }, 800); }
         else { alert(d.msg || '更新失败'); }
@@ -145,7 +145,8 @@ function submitResetPw() {
     if (!pw) { alert('请输入新密码'); return; }
     fetch('/admin/users/reset-password/' + _resetPwId, {
         method: 'POST',
-        headers: {'Content-Type': 'application/x-www-form-urlencoded'},
+        credentials: 'same-origin',
+        headers: {'Content-Type': 'application/x-www-form-urlencoded', 'X-Requested-With': 'fetch'},
         body: 'password=' + encodeURIComponent(pw)
     }).then(r => r.json()).then(d => {
         if (d.ok) { closeResetPw(); showToast('密码修改成功'); }

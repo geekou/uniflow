@@ -161,7 +161,7 @@
                     btn.disabled = true;
                     btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin mr-1"></i> 提交中...';
                 }
-                fetch(action, { method: method, body: fd, credentials: 'same-origin' })
+                fetch(action, { method: method, body: fd, credentials: 'same-origin', headers: {'X-Requested-With': 'fetch'} })
                     .then(function(res) {
                         if (res.redirected || res.status === 302 || res.status === 200) {
                             var isEdit = action.includes('/edit/');

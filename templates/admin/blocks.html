@@ -274,7 +274,7 @@
             if (pendingDeleteUrl) {
                 var url = pendingDeleteUrl;
                 closeConfirm();
-                fetch(url, {method: 'POST', headers: {'X-Requested-With': 'fetch'}})
+                fetch(url, {method: 'POST', credentials: 'same-origin', headers: {'X-Requested-With': 'fetch'}})
                     .then(function(r) { return r.text(); })
                     .then(function(text) {
                         try {
@@ -389,7 +389,7 @@
             else if (act.includes('/sitemap')) actionMsg = '生成成功';
             else actionMsg = '操作成功';
 
-            fetch(form.action, { method: 'POST', body: formData, headers: {'X-Requested-With': 'fetch'} })
+            fetch(form.action, { method: 'POST', body: formData, credentials: 'same-origin', headers: {'X-Requested-With': 'fetch'} })
                 .then(function(r) {
                     // Check if response is JSON
                     var ct = r.headers.get('content-type') || '';

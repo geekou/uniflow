@@ -4,6 +4,7 @@ import (
 	"database/sql"
 	"encoding/json"
 	"fmt"
+	"github.com/google/uuid"
 	"html/template"
 	"io"
 	"log"
@@ -270,7 +271,7 @@ func AdminPostCreatePost(db *sql.DB) gin.HandlerFunc {
 			projectRoot := getProjectRoot(c)
 			uploadsDir := filepath.Join(projectRoot, "uploads")
 			os.MkdirAll(uploadsDir, 0755)
-			tmpPath := filepath.Join(uploadsDir, "tmp_cover_"+filepath.Base(header.Filename))
+			tmpPath := filepath.Join(uploadsDir, "tmp_cover_"+uuid.New().String()+filepath.Ext(filepath.Base(header.Filename)))
 			dst, err := os.Create(tmpPath)
 			if err == nil {
 				written, _ := io.Copy(dst, io.LimitReader(file, maxUploadSize+1))
@@ -402,7 +403,7 @@ func AdminPostEditPost(db *sql.DB) gin.HandlerFunc {
 			projectRoot := getProjectRoot(c)
 			uploadsDir := filepath.Join(projectRoot, "uploads")
 			os.MkdirAll(uploadsDir, 0755)
-			tmpPath := filepath.Join(uploadsDir, "tmp_cover_"+filepath.Base(header.Filename))
+			tmpPath := filepath.Join(uploadsDir, "tmp_cover_"+uuid.New().String()+filepath.Ext(filepath.Base(header.Filename)))
 			dst, err := os.Create(tmpPath)
 			if err == nil {
 				written, _ := io.Copy(dst, io.LimitReader(file, maxUploadSize+1))
@@ -738,7 +739,7 @@ func AdminMomentCreatePost(db *sql.DB) gin.HandlerFunc {
 				if err != nil {
 					continue
 				}
-				tmpPath := filepath.Join(uploadsDir, "tmp_"+filepath.Base(fh.Filename))
+				tmpPath := filepath.Join(uploadsDir, "tmp_"+uuid.New().String()+filepath.Ext(filepath.Base(fh.Filename)))
 				dst, err := os.Create(tmpPath)
 				if err != nil {
 					file.Close()
@@ -830,10 +831,13 @@ func AdminMomentEditPost(db *sql.DB) gin.HandlerFunc {
 				if !deletedSet[m] {
 					kept = append(kept, m)
 				} else {
-					// 从磁盘删除文件
+					// 从磁盘删除文件，仅允许删除 uploads 下的文件
 					projectRoot := getProjectRoot(c)
-					filePath := filepath.Join(projectRoot, m)
-					os.Remove(filePath)
+					if strings.HasPrefix(m, "/uploads/") {
+						if err := deleteMediaFile(projectRoot, strings.TrimPrefix(m, "/uploads/")); err != nil {
+							log.Printf("[MomentEdit] failed to delete media %s: %v", m, err)
+						}
+					}
 				}
 			}
 			existingMedia = strings.Join(kept, ",")
@@ -853,7 +857,7 @@ func AdminMomentEditPost(db *sql.DB) gin.HandlerFunc {
 				if err != nil {
 					continue
 				}
-				tmpPath := filepath.Join(uploadsDir, "tmp_"+filepath.Base(fh.Filename))
+				tmpPath := filepath.Join(uploadsDir, "tmp_"+uuid.New().String()+filepath.Ext(filepath.Base(fh.Filename)))
 				dst, err := os.Create(tmpPath)
 				if err != nil {
 					file.Close()
@@ -1164,7 +1168,7 @@ func AdminUpload(db *sql.DB) gin.HandlerFunc {
 		// 重置 file reader 以便后续保存
 		file.Seek(0, 0)
 
-		tmpPath := filepath.Join(uploadsDir, "tmp_"+filepath.Base(header.Filename))
+		tmpPath := filepath.Join(uploadsDir, "tmp_"+uuid.New().String()+filepath.Ext(filepath.Base(header.Filename)))
 		// 保存临时文件
 		dst, err := os.Create(tmpPath)
 		if err != nil {
@@ -1257,7 +1261,7 @@ func AdminMediaBatchDelete(db *sql.DB) gin.HandlerFunc {
 }
 
 func isImageExt(ext string) bool {
-	return ext == ".jpg" || ext == ".jpeg" || ext == ".png" || ext == ".gif" || ext == ".webp" || ext == ".bmp" || ext == ".svg"
+	return ext == ".jpg" || ext == ".jpeg" || ext == ".png" || ext == ".gif" || ext == ".webp" || ext == ".bmp"
 }
 
 func isVideoExt(ext string) bool {
@@ -1291,7 +1295,7 @@ func AdminSettingsPost(db *sql.DB) gin.HandlerFunc {
 			projectRoot := getProjectRoot(c)
 			uploadsDir := filepath.Join(projectRoot, "uploads")
 			os.MkdirAll(uploadsDir, 0755)
-			tmpPath := filepath.Join(uploadsDir, "tmp_banner_"+filepath.Base(header.Filename))
+			tmpPath := filepath.Join(uploadsDir, "tmp_banner_"+uuid.New().String()+filepath.Ext(filepath.Base(header.Filename)))
 			dst, err := os.Create(tmpPath)
 			if err == nil {
 				written, _ := io.Copy(dst, io.LimitReader(file, maxUploadSize+1))
@@ -1332,7 +1336,7 @@ func AdminSettingsPost(db *sql.DB) gin.HandlerFunc {
 				projectRoot := getProjectRoot(c)
 				uploadsDir := filepath.Join(projectRoot, "uploads")
 				os.MkdirAll(uploadsDir, 0755)
-				tmpPath := filepath.Join(uploadsDir, qf.prefix+qrHeader.Filename)
+				tmpPath := filepath.Join(uploadsDir, qf.prefix+uuid.New().String()+filepath.Ext(filepath.Base(qrHeader.Filename)))
 				dst, dstErr := os.Create(tmpPath)
 				if dstErr == nil {
 					written, _ := io.Copy(dst, io.LimitReader(qrFile, maxUploadSize+1))
@@ -1438,7 +1442,7 @@ func AdminAboutPost(db *sql.DB) gin.HandlerFunc {
 		if err == nil {
 			uploadsDir := filepath.Join(getProjectRoot(c), "uploads")
 			os.MkdirAll(uploadsDir, 0755)
-			tmpPath := filepath.Join(uploadsDir, "tmp_avatar_"+filepath.Base(file.Filename))
+			tmpPath := filepath.Join(uploadsDir, "tmp_avatar_"+uuid.New().String()+filepath.Ext(filepath.Base(file.Filename)))
 			if err := c.SaveUploadedFile(file, tmpPath); err == nil {
 				filename, _, _ := utils.ProcessUploadedFile(tmpPath, uploadsDir)
 				if filename != "" {
@@ -1588,7 +1592,7 @@ func AdminUserUpdate(db *sql.DB) gin.HandlerFunc {
 		if fErr == nil {
 			uploadsDir := filepath.Join(getProjectRoot(c), "uploads")
 			os.MkdirAll(uploadsDir, 0755)
-			tmpPath := filepath.Join(uploadsDir, "tmp_avatar_"+filepath.Base(file.Filename))
+			tmpPath := filepath.Join(uploadsDir, "tmp_avatar_"+uuid.New().String()+filepath.Ext(filepath.Base(file.Filename)))
 			if err := c.SaveUploadedFile(file, tmpPath); err == nil {
 				filename, _, _ := utils.ProcessUploadedFile(tmpPath, uploadsDir)
 				if filename != "" {
@@ -2175,7 +2179,7 @@ func CommentSubmit(db *sql.DB) gin.HandlerFunc {
 				projectRoot := getProjectRoot(c)
 				uploadsDir := filepath.Join(projectRoot, "uploads")
 				os.MkdirAll(uploadsDir, 0755)
-				tmpPath := filepath.Join(uploadsDir, "tmp_comment_"+filepath.Base(fh.Filename))
+				tmpPath := filepath.Join(uploadsDir, "tmp_comment_"+uuid.New().String()+filepath.Ext(filepath.Base(fh.Filename)))
 				if saveErr := c.SaveUploadedFile(fh, tmpPath); saveErr == nil {
 					if filename, _, procErr := utils.ProcessUploadedFile(tmpPath, uploadsDir); procErr == nil && filename != "" {
 						imageURL = "/uploads/" + filename

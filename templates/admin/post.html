@@ -164,7 +164,7 @@
         function uploadFile(file, callback) {
             var fd = new FormData();
             fd.append('file', file);
-            fetch('/admin/upload', { method: 'POST', body: fd, credentials: 'same-origin' })
+            fetch('/admin/upload', { method: 'POST', body: fd, credentials: 'same-origin', headers: {'X-Requested-With': 'fetch'} })
                 .then(function(r) { return r.json(); })
                 .then(function(data) {
                     if (data.url) { callback(data.url); }
@@ -247,7 +247,7 @@
                 }
             }
             var isEdit = form.action.includes('/edit/');
-            fetch(form.action, { method: 'POST', body: formData, headers: {'X-Requested-With': 'fetch'} })
+            fetch(form.action, { method: 'POST', body: formData, credentials: 'same-origin', headers: {'X-Requested-With': 'fetch'} })
                 .then(function(r) {
                     if (r.redirected || r.ok) {
                         showToast(isEdit ? '文章已更新' : '文章已发布', 'success');

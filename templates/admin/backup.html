@@ -4,7 +4,7 @@ function createBackup() {
     var btn = document.getElementById('btn-backup');
     btn.disabled = true;
     btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin mr-1"></i>备份中...';
-    fetch('/admin/backup/create', {method: 'POST', headers: {'X-Requested-With': 'fetch'}})
+    fetch('/admin/backup/create', {method: 'POST', credentials: 'same-origin', headers: {'X-Requested-With': 'fetch'}})
         .then(function(r) { return r.json(); })
         .then(function(data) {
             if (data.ok) {

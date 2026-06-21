@@ -365,15 +365,12 @@ func CSRFMiddleware() gin.HandlerFunc {
 			c.Next()
 			return
 		}
-		// 带 X-Requested-With 的 fetch 请求天然防 CSRF，直接放行
-		if c.GetHeader("X-Requested-With") == "fetch" {
-			c.Next()
-			return
-		}
+
 		origin := c.Request.Header.Get("Origin")
 		referer := c.Request.Header.Get("Referer")
 		host := c.Request.Host
-		// 浏览器原生表单提交必须有 Origin 或 Referer
+
+		// 写操作必须携带 Origin 或 Referer，fetch 请求也必须同源，不能只依赖自定义头。
 		if origin == "" && referer == "" {
 			c.JSON(http.StatusForbidden, gin.H{"ok": false, "msg": "CSRF 验证失败：缺少 Origin/Referer"})
 			c.Abort()
