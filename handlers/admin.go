@@ -1206,14 +1206,22 @@ func AdminUpload(db *sql.DB) gin.HandlerFunc {
 
 func deleteMediaFile(projectRoot, name string) error {
 	uploadsDir := filepath.Join(projectRoot, "uploads")
-	// 只取文件名部分，丢弃任何路径
 	baseName := filepath.Base(name)
+	if baseName == "." || baseName == string(os.PathSeparator) || baseName == "" {
+		return fmt.Errorf("非法文件名")
+	}
 	target := filepath.Join(uploadsDir, baseName)
 	cleanTarget := filepath.Clean(target)
 	cleanUploads := filepath.Clean(uploadsDir)
-	// 确保最终路径仍在 uploads 目录内
-	if cleanTarget != cleanUploads && !strings.HasPrefix(cleanTarget, cleanUploads+string(os.PathSeparator)) {
+	if !strings.HasPrefix(cleanTarget, cleanUploads+string(os.PathSeparator)) {
 		return fmt.Errorf("非法路径")
+	}
+	info, err := os.Stat(cleanTarget)
+	if err != nil {
+		return err
+	}
+	if info.IsDir() {
+		return fmt.Errorf("不能删除目录")
 	}
 	return os.Remove(cleanTarget)
 }
@@ -1910,23 +1918,35 @@ func AdminBackupCreate(db *sql.DB) gin.HandlerFunc {
 	}
 }
 
+func resolveBackupPath(projectRoot, name string) (string, string, error) {
+	baseName := filepath.Base(name)
+	if baseName == "." || baseName == string(os.PathSeparator) || baseName == "" || !strings.HasSuffix(baseName, ".tar.gz") {
+		return "", "", fmt.Errorf("非法备份文件")
+	}
+	backupDir := filepath.Join(projectRoot, "backups")
+	backupPath := filepath.Clean(filepath.Join(backupDir, baseName))
+	cleanBackupDir := filepath.Clean(backupDir)
+	if !strings.HasPrefix(backupPath, cleanBackupDir+string(os.PathSeparator)) {
+		return "", "", fmt.Errorf("非法路径")
+	}
+	return backupPath, baseName, nil
+}
+
 func AdminBackupRestore(db *sql.DB) gin.HandlerFunc {
 	return func(c *gin.Context) {
-		name := c.Param("name")
-		// 安全检查：防止路径穿越
-		if strings.Contains(name, "..") {
-			c.JSON(http.StatusBadRequest, gin.H{"ok": false, "msg": "非法路径"})
+		projectRoot := getProjectRoot(c)
+		backupFile, _, err := resolveBackupPath(projectRoot, c.Param("name"))
+		if err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"ok": false, "msg": err.Error()})
 			return
 		}
-		projectRoot := getProjectRoot(c)
-		backupFile := filepath.Join(projectRoot, "backups", name)
 
 		log.Printf("[Restore] Starting restore from: %s", backupFile)
 
 		// 先关闭数据库连接，避免覆盖正在使用的文件
 		db.Close()
 
-		err := utils.RestoreBackup(utils.DefaultBackupConfig(projectRoot), backupFile)
+		err = utils.RestoreBackup(utils.DefaultBackupConfig(projectRoot), backupFile)
 		if err != nil {
 			log.Printf("[Restore] Failed: %v", err)
 			c.JSON(500, gin.H{"ok": false, "msg": "恢复失败: " + err.Error()})
@@ -1952,14 +1972,16 @@ func AdminBackupRestore(db *sql.DB) gin.HandlerFunc {
 
 func AdminBackupDelete(db *sql.DB) gin.HandlerFunc {
 	return func(c *gin.Context) {
-		name := c.Param("name")
-		// 安全检查：防止路径穿越
-		if strings.Contains(name, "..") {
-			c.JSON(http.StatusBadRequest, gin.H{"ok": false, "msg": "非法路径"})
+		projectRoot := getProjectRoot(c)
+		backupPath, _, err := resolveBackupPath(projectRoot, c.Param("name"))
+		if err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"ok": false, "msg": err.Error()})
 			return
 		}
-		projectRoot := getProjectRoot(c)
-		utils.DeleteBackup(filepath.Join(projectRoot, "backups", name))
+		if err := utils.DeleteBackup(backupPath); err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"ok": false, "msg": "删除失败"})
+			return
+		}
 		c.JSON(http.StatusOK, gin.H{"ok": true})
 	}
 }
@@ -1967,22 +1989,20 @@ func AdminBackupDelete(db *sql.DB) gin.HandlerFunc {
 // AdminBackupDownload 需要认证的备份文件下载
 func AdminBackupDownload(db *sql.DB) gin.HandlerFunc {
 	return func(c *gin.Context) {
-		name := c.Param("name")
-		// 安全检查：防止路径穿越
-		if strings.Contains(name, "..") {
+		projectRoot := getProjectRoot(c)
+		backupPath, backupName, err := resolveBackupPath(projectRoot, c.Param("name"))
+		if err != nil {
 			c.String(http.StatusBadRequest, "非法路径")
 			return
 		}
 
-		projectRoot := getProjectRoot(c)
-		backupPath := filepath.Join(projectRoot, "backups", name)
-
-		if _, err := os.Stat(backupPath); os.IsNotExist(err) {
+		info, err := os.Stat(backupPath)
+		if err != nil || info.IsDir() {
 			c.String(http.StatusNotFound, "文件不存在")
 			return
 		}
 
-		c.FileAttachment(backupPath, name)
+		c.FileAttachment(backupPath, backupName)
 	}
 }
 

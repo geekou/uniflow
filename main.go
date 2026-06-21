@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"html"
 	"html/template"
 	"log"
 	"net/http"
@@ -193,8 +194,8 @@ func main() {
 		"safeHTML": func(s string) template.HTML {
 			return template.HTML(utils.SanitizeHTML(s))
 		},
-		"split":    func(s, sep string) []string { return strings.Split(s, sep) },
-		"isVideo":  func(s string) bool {
+		"split": func(s, sep string) []string { return strings.Split(s, sep) },
+		"isVideo": func(s string) bool {
 			ext := strings.ToLower(s)
 			for _, v := range []string{".mp4", ".webm", ".mov", ".avi"} {
 				if strings.HasSuffix(ext, v) {
@@ -342,7 +343,7 @@ func main() {
 	api.Use(handlers.RateLimitMiddleware(db))
 	api.Use(handlers.SensitiveWordFilter(db))
 	{
-	api.POST("/comment", handlers.CommentSubmit(db))
+		api.POST("/comment", handlers.CommentSubmit(db))
 		api.POST("/guestbook", handlers.GuestbookSubmit(db))
 	}
 
@@ -473,7 +474,7 @@ func main() {
 			for _, hp := range hotPosts {
 				hotHTML += fmt.Sprintf(
 					`<a href="/post/%d" class="block p-3 bg-white rounded-xl border border-gray-100 hover:border-indigo-200 hover:shadow-sm transition text-left text-sm text-gray-700 hover:text-indigo-500 truncate">%s</a>`,
-					hp.ID, hp.Title,
+					hp.ID, html.EscapeString(hp.Title),
 				)
 			}
 			hotHTML += `</div>`
