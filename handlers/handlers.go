@@ -336,10 +336,12 @@ func IndexHandler(db *sql.DB) gin.HandlerFunc {
 			SELECT p.id, p.title, p.content, p.thumb_url, p.author, p.views, p.category_id,
 			       p.is_top, p.privacy, p.status, p.publish_at, p.created_at, p.updated_at,
 			       COALESCE(c.name, '') as category_name, COALESCE(c.slug,'') as category_slug,
-			       (SELECT COUNT(*) FROM comments WHERE target_type='post' AND target_id=p.id) as comment_count
+			       COUNT(cm.id) as comment_count
 			FROM posts p
 			LEFT JOIN categories c ON p.category_id = c.id
+			LEFT JOIN comments cm ON cm.target_type='post' AND cm.target_id=p.id
 			%s
+			GROUP BY p.id
 			ORDER BY p.is_top DESC, p.created_at DESC
 			LIMIT ? OFFSET ?
 		`, where)
@@ -467,10 +469,12 @@ func PostsListHandler(db *sql.DB) gin.HandlerFunc {
 			SELECT p.id, p.title, p.content, p.thumb_url, p.author, p.views, p.category_id,
 			       p.is_top, p.privacy, p.status, p.publish_at, p.created_at, p.updated_at,
 			       COALESCE(c.name, '') as category_name, COALESCE(c.slug,'') as category_slug,
-			       (SELECT COUNT(*) FROM comments WHERE target_type='post' AND target_id=p.id) as comment_count
+			       COUNT(cm.id) as comment_count
 			FROM posts p
 			LEFT JOIN categories c ON p.category_id = c.id
+			LEFT JOIN comments cm ON cm.target_type='post' AND cm.target_id=p.id
 			%s
+			GROUP BY p.id
 			ORDER BY p.is_top DESC, p.created_at DESC
 			LIMIT ? OFFSET ?
 		`, where)
@@ -947,9 +951,9 @@ func CustomPageHandler(db *sql.DB) gin.HandlerFunc {
 			return
 		}
 
-	// 统一净化 HTML 内容，防止 XSS
-	content := template.HTML(utils.SanitizeHTML(string(pv.HTMLContent)))
-	pv.HTMLContent = content
+		// 统一净化 HTML 内容，防止 XSS
+		content := template.HTML(utils.SanitizeHTML(string(pv.HTMLContent)))
+		pv.HTMLContent = content
 
 		c.HTML(http.StatusOK, "page.html", PageData{
 			SiteTitle:        settings["site_title"],

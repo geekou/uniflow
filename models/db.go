@@ -226,12 +226,18 @@ func createTables() error {
 		`CREATE INDEX IF NOT EXISTS idx_posts_status ON posts(status)`,
 		`CREATE INDEX IF NOT EXISTS idx_posts_publish_at ON posts(publish_at)`,
 		`CREATE INDEX IF NOT EXISTS idx_posts_is_top ON posts(is_top)`,
+		`CREATE INDEX IF NOT EXISTS idx_posts_public_list ON posts(status, privacy, is_top DESC, created_at DESC)`,
+		`CREATE INDEX IF NOT EXISTS idx_posts_public_views ON posts(status, privacy, views DESC)`,
+		`CREATE INDEX IF NOT EXISTS idx_posts_scheduled ON posts(status, publish_at)`,
 		`CREATE INDEX IF NOT EXISTS idx_comments_target ON comments(target_type, target_id)`,
-		`CREATE INDEX IF NOT EXISTS idx_moments_created ON moments(created_at)`,
+		`CREATE INDEX IF NOT EXISTS idx_comments_created ON comments(created_at DESC)`,
+		`CREATE INDEX IF NOT EXISTS idx_moments_created ON moments(created_at DESC)`,
 		`CREATE INDEX IF NOT EXISTS idx_logs_type ON logs(log_type)`,
-		`CREATE INDEX IF NOT EXISTS idx_logs_created ON logs(created_at)`,
+		`CREATE INDEX IF NOT EXISTS idx_logs_type_id ON logs(log_type, id DESC)`,
 		`CREATE INDEX IF NOT EXISTS idx_users_username ON users(username)`,
-		`CREATE INDEX IF NOT EXISTS idx_guestbook_created ON guestbook(created_at)`,
+		`CREATE INDEX IF NOT EXISTS idx_guestbook_created ON guestbook(created_at DESC)`,
+		`CREATE INDEX IF NOT EXISTS idx_menus_order ON menus(parent_id, order_num, id)`,
+		`CREATE INDEX IF NOT EXISTS idx_post_tags_tag ON post_tags(tag_id, post_id)`,
 	}
 
 	for _, ddl := range tables {
