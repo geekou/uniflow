@@ -1,0 +1,12 @@
+{{define "partials/searchbar"}}
+<div class="hidden md:flex bg-white rounded-2xl p-3 shadow-xs border border-gray-100/50 items-center justify-between">
+    <form action="/search" method="get" class="flex items-center space-x-3 flex-1 max-w-lg bg-gray-50 px-4 py-2 rounded-xl border border-gray-100">
+        <i class="fa-solid fa-magnifying-glass text-gray-400 text-sm"></i>
+        <input type="text" name="q" placeholder="搜索文章、分类或标签..." class="bg-transparent text-sm w-full outline-none text-gray-600 placeholder-gray-400" value="{{.SearchQuery}}">
+    </form>
+    <div class="flex items-center space-x-4 pl-4">
+        {{if .SiteNotification}}<button onclick="toggleNotification()" class="text-gray-500 hover:text-indigo-600 transition relative"><i class="fa-regular fa-bell text-lg"></i><span class="absolute top-0 right-0 w-1.5 h-1.5 bg-red-500 rounded-full animate-pulse"></span></button>{{else}}<button class="text-gray-300 cursor-default relative"><i class="fa-regular fa-bell text-lg"></i></button>{{end}}
+        <a href="/admin" class="block"><img loading="lazy" class="w-8 h-8 rounded-full border hover:ring-2 hover:ring-indigo-300 transition" src="{{if safeImageURL .AboutMe.Avatar}}{{safeImageURL .AboutMe.Avatar}}{{else}}https://api.dicebear.com/7.x/adventurer/svg?seed={{defaultName .AboutMe.Name}}{{end}}" alt="user"></a>
+    </div>
+</div>
+{{end}}

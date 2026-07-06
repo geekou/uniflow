@@ -1,0 +1,34 @@
+{{define "partials/footer-scripts"}}
+{{template "partials/backtotop" .}}
+<script>
+(function() {
+    var ob = document.getElementById('open-sidebar'), cb = document.getElementById('close-sidebar'),
+        sb = document.getElementById('sidebar'), ov = document.getElementById('sidebar-overlay');
+    function ts(o) {
+        if (o) { sb.classList.remove('-translate-x-full'); ov.classList.remove('invisible','opacity-0'); ov.classList.add('opacity-100'); document.body.classList.add('overflow-hidden'); }
+        else { sb.classList.add('-translate-x-full'); ov.classList.remove('opacity-100'); ov.classList.add('opacity-0'); setTimeout(function(){ov.classList.add('invisible');},300); document.body.classList.remove('overflow-hidden'); }
+    }
+    if (ob) ob.addEventListener('click', function(){ts(true)});
+    if (cb) cb.addEventListener('click', function(){ts(false)});
+    if (ov) ov.addEventListener('click', function(){ts(false)});
+})();
+</script>
+<script>
+(function() {
+    var el = document.getElementById('site-uptime');
+    if (!el) return;
+    var f = el.getAttribute('data-founded');
+    if (!f) return;
+    var fd = new Date(f);
+    if (isNaN(fd.getTime())) return;
+    function up() {
+        var now = new Date(), diff = now - fd;
+        var d=Math.floor(diff/86400000),h=Math.floor((diff%86400000)/3600000),m=Math.floor((diff%3600000)/60000),s=Math.floor((diff%60000)/1000);
+        var de=document.getElementById('site-uptime-d'),he=document.getElementById('site-uptime-h'),me=document.getElementById('site-uptime-m'),se=document.getElementById('site-uptime-s');
+        if(de)de.textContent=d;if(he)he.textContent=String(h).padStart(2,'0');if(me)me.textContent=String(m).padStart(2,'0');if(se)se.textContent=String(s).padStart(2,'0');
+    }
+    up();setInterval(up,1000);
+})();
+</script>
+<script>(function(){var p=location.pathname;document.querySelectorAll('nav a').forEach(function(a){var h=a.getAttribute('href');if(h===p||(p!=='/'&&h!=='/'&&p.startsWith(h))){a.classList.add('text-indigo-600','font-semibold');}});})();</script>
+{{end}}

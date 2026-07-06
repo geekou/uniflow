@@ -1,0 +1,24 @@
+{{define "partials/notification"}}
+<div id="notification-panel" style="display:none;position:fixed;top:56px;right:16px;z-index:9999;width:288px;background:#fff;border-radius:16px;box-shadow:0 8px 30px rgba(0,0,0,.12);border:1px solid #f3f4f6;padding:16px;opacity:0;transition:opacity .3s,transform .3s;transform:translateX(20px)">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">
+        <span style="font-size:11px;font-weight:700;color:#6b7280"><i class="fa-solid fa-bullhorn" style="color:#6366f1;margin-right:4px"></i>站点通知</span>
+        <button onclick="toggleNotification()" style="font-size:12px;color:#9ca3af;border:none;background:none;cursor:pointer"><i class="fa-solid fa-xmark"></i></button>
+    </div>
+    <p style="font-size:14px;color:#374151;line-height:1.6">{{.SiteNotification}}</p>
+</div>
+<script>
+function toggleNotification() {
+    var p = document.getElementById('notification-panel');
+    if (!p) return;
+    if (p.style.opacity === '1') { p.style.opacity = '0'; p.style.transform = 'translateX(20px)'; setTimeout(function(){p.style.display='none';},300); }
+    else { p.style.display='block'; setTimeout(function(){p.style.opacity='1';p.style.transform='translateX(0)';},10); }
+}
+document.addEventListener('click', function(e) {
+    var p = document.getElementById('notification-panel');
+    if (!p) return;
+    if (!e.target.closest('[onclick="toggleNotification()"]') && !p.contains(e.target) && p.style.opacity === '1') {
+        p.style.opacity = '0'; p.style.transform = 'translateX(20px)'; setTimeout(function(){p.style.display='none';},300);
+    }
+});
+</script>
+{{end}}

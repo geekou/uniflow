@@ -1,0 +1,43 @@
+{{define "partials/sidebar"}}
+            <aside id="sidebar" class="tri-scroll-column fixed top-0 left-0 bottom-0 w-72 bg-white p-6 z-50 transform -translate-x-full transition-transform duration-300 ease-in-out md:relative md:translate-x-0 md:w-auto md:p-6 md:rounded-3xl md:shadow-xs md:border md:border-gray-100/50 space-y-6 flex flex-col justify-between overflow-y-auto md:overflow-y-visible no-scrollbar h-screen md:h-auto">
+                <div class="space-y-6">
+                    <div class="flex items-center justify-between md:hidden pb-2 border-b border-gray-50">
+                        <span class="font-bold text-gray-400 text-xs tracking-wider">导航菜单</span>
+                        <button id="close-sidebar" class="text-gray-400 hover:text-gray-600 p-1 text-lg"><i class="fa-solid fa-xmark"></i></button>
+                    </div>
+                    <div class="flex items-center space-x-3 px-2">
+                        <div class="w-10 h-10 bg-indigo-600 rounded-xl flex items-center justify-center text-white font-bold text-xl shadow-md shadow-indigo-200">U</div>
+                        <div><h1 class="text-lg font-bold tracking-tight">{{.SiteTitle}}</h1><p class="text-xs text-gray-400">{{.SiteSubtitle}}</p></div>
+                    </div>
+                    <nav class="space-y-1">
+                        {{range .Menus}}<a href="{{safeMenuURL .URL}}" class="flex items-center space-x-3 px-4 py-3 text-gray-600 hover:bg-gray-50 hover:text-indigo-600 font-medium rounded-xl transition">{{if .Icon}}<i class="{{.Icon}} text-sm"></i>{{end}}<span>{{.Name}}</span></a>{{end}}
+                    </nav>
+                    <div class="space-y-3">
+                        <h3 class="text-xs font-bold text-gray-400 px-1 tracking-wider">站点统计</h3>
+                        <div class="grid grid-cols-2 gap-3 text-sm">
+                            <div class="bg-gray-50 p-2.5 rounded-xl"><p class="text-xs text-gray-400">文章数</p><p class="text-base font-bold mt-0.5">{{.Stats.PostCount}}</p></div>
+                            <div class="bg-gray-50 p-2.5 rounded-xl"><p class="text-xs text-gray-400">分类数</p><p class="text-base font-bold mt-0.5">{{.Stats.CategoryCount}}</p></div>
+                            <div class="bg-gray-50 p-2.5 rounded-xl"><p class="text-xs text-gray-400">标签数</p><p class="text-base font-bold mt-0.5">{{.Stats.TagCount}}</p></div>
+                            <div class="bg-gray-50 p-2.5 rounded-xl"><p class="text-xs text-gray-400">评论数</p><p class="text-base font-bold mt-0.5">{{.Stats.CommentCount}}</p></div>
+                        </div>
+                        <div class="bg-gray-50 p-2.5 rounded-xl flex justify-between items-center text-sm">
+                            <span class="text-xs text-gray-400">访问量</span>
+                            <span class="font-bold">{{.Stats.TotalViews}}</span>
+                        </div>
+                    </div>
+                </div>
+                <div id="site-uptime" data-founded="{{.SiteFoundedAt}}">
+                    <h3 class="text-xs font-bold text-gray-400 px-1 tracking-wider mb-2">本站已运行</h3>
+                    <div class="bg-white rounded-xl px-3 py-2.5 flex items-baseline justify-center gap-0.5 font-mono text-lg tracking-tight border border-gray-100">
+                        <span id="site-uptime-d" class="text-indigo-600 font-bold">0</span><span class="text-gray-400 text-xs mr-1">天</span>
+                        <span id="site-uptime-h" class="text-indigo-600 font-bold">00</span><span class="text-gray-300 animate-pulse">:</span>
+                        <span id="site-uptime-m" class="text-indigo-600 font-bold">00</span><span class="text-gray-300 animate-pulse">:</span>
+                        <span id="site-uptime-s" class="text-indigo-600 font-bold">00</span>
+                    </div>
+                </div>
+                <footer class="text-center text-xs text-gray-400 space-y-2 pt-6 border-t border-gray-50">
+                    <p>&copy; 2026 {{.SiteTitle}}</p>
+                    <p class="text-[10px]">Powered by UniFlow</p>
+                </footer>
+            </aside>
+{{end}}

@@ -3,10 +3,13 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link rel="alternate" type="application/rss+xml" title="{{.SiteTitle}} RSS" href="/rss">
     <title>留言板 - {{.SiteTitle}}</title>
-    <script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4"></script>
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
-    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/glightbox@3.3.0/dist/css/glightbox.min.css">
+    <link href="/static/css/dark.css" rel="stylesheet">
+    <link href="/static/css/tailwind.css" rel="stylesheet">
+    <script src="/static/vendor/tailwindcss.js"></script>
+    <link rel="stylesheet" href="/static/vendor/fontawesome/css/all.min.css">
+    <link rel="stylesheet" href="/static/vendor/glightbox/glightbox.min.css">
     <style>
         body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif; }
         .no-scrollbar::-webkit-scrollbar { display: none; }
@@ -58,6 +61,12 @@
             pointer-events: auto;
             transform: translate3d(0, var(--bubble-y, 0px), 0);
             transition: max-width 0.25s ease, border-radius 0.25s ease, box-shadow 0.25s ease;
+            /* 毛玻璃质感 */
+            background: rgba(255, 255, 255, 0.55);
+            backdrop-filter: blur(16px) saturate(160%);
+            -webkit-backdrop-filter: blur(16px) saturate(160%);
+            border: 1px solid rgba(255, 255, 255, 0.6);
+            box-shadow: 0 4px 20px rgba(99, 102, 241, 0.06), 0 1px 4px rgba(0, 0, 0, 0.04), inset 0 1px 0 rgba(255, 255, 255, 0.5);
         }
         .guestbook-marquee-text {
             display: block;
@@ -74,7 +83,11 @@
             z-index: 5;
             max-width: min(86vw, 760px);
             border-radius: 22px;
-            box-shadow: 0 16px 36px rgba(99, 102, 241, 0.18);
+            background: rgba(255, 255, 255, 0.75);
+            backdrop-filter: blur(24px) saturate(180%);
+            -webkit-backdrop-filter: blur(24px) saturate(180%);
+            border-color: rgba(147, 155, 254, 0.5);
+            box-shadow: 0 16px 40px rgba(99, 102, 241, 0.12), 0 2px 8px rgba(0, 0, 0, 0.06), inset 0 1px 0 rgba(255, 255, 255, 0.6);
         }
         .guestbook-marquee-bubble:hover .guestbook-marquee-text {
             max-width: min(70vw, 620px);
@@ -87,130 +100,42 @@
         #back-to-top{position:fixed;bottom:2rem;right:2rem;z-index:50;width:2.5rem;height:2.5rem;border-radius:50%;background:rgba(99,102,241,0.85);color:#fff;display:flex;align-items:center;justify-content:center;font-size:1.1rem;opacity:0;visibility:hidden;transform:translateY(10px);transition:all 0.3s ease;box-shadow:0 4px 12px rgba(99,102,241,0.3);cursor:pointer}
         #back-to-top.show{opacity:1;visibility:visible;transform:translateY(0)}
         #back-to-top:hover{background:rgba(79,70,229,1);transform:translateY(-2px)}
+        @media (min-width: 768px) {
+            .tri-scroll-layout { align-items: start; }
+            .tri-scroll-column {
+                max-height: calc(100vh - 3rem);
+                overflow-y: auto !important;
+                overscroll-behavior: contain;
+                scrollbar-width: none;
+                scroll-behavior: auto;
+            }
+            .tri-scroll-column::-webkit-scrollbar { display: none; }
+            #sidebar.tri-scroll-column,
+            main.tri-scroll-column { position: sticky; top: 1.5rem; }
+        }
     </style>
 </head>
 <body class="bg-[#F4F6F9] text-gray-800 min-h-screen">
 
-    <!-- 通知弹窗（全局，必须在顶层容器外） -->
-    <div id="notification-panel" style="display:none;position:fixed;top:56px;right:16px;z-index:9999;width:288px;background:#fff;border-radius:16px;box-shadow:0 8px 30px rgba(0,0,0,0.12);border:1px solid #f3f4f6;padding:16px;opacity:0;transition:opacity 0.3s,transform 0.3s;transform:translateX(20px)">
-        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">
-            <span style="font-size:11px;font-weight:700;color:#6b7280"><i class="fa-solid fa-bullhorn" style="color:#6366f1;margin-right:4px"></i>站点通知</span>
-            <button onclick="toggleNotification()" style="font-size:12px;color:#9ca3af;border:none;background:none;cursor:pointer"><i class="fa-solid fa-xmark"></i></button>
-        </div>
-        <p style="font-size:14px;color:#374151;line-height:1.6">{{.SiteNotification}}</p>
-    </div>
+{{template "partials/notification" .}}
 
-    <!-- ========== 移动端顶栏（含搜索框） ========== -->
-    <div class="md:hidden bg-white px-3 py-2 shadow-xs border-b border-gray-100 sticky top-0 z-40 space-y-2">
-        <div class="flex items-center justify-between">
-            <div class="flex items-center space-x-2">
-                <button id="open-sidebar" class="text-gray-600 p-1 text-lg active:scale-95 transition">
-                    <i class="fa-solid fa-bars"></i>
-                </button>
-                <span class="font-bold text-base tracking-tight text-indigo-600">{{.SiteTitle}}</span>
-            </div>
-            <div class="flex items-center space-x-3">
-                {{if .SiteNotification}}
-                <button onclick="toggleNotification()" class="text-gray-500 hover:text-indigo-600 transition relative"><i class="fa-regular fa-bell text-sm"></i><span class="absolute top-0 right-0 w-1.5 h-1.5 bg-red-500 rounded-full animate-pulse"></span></button>
-                {{else}}
-                <button class="text-gray-300 cursor-default relative"><i class="fa-regular fa-bell text-sm"></i></button>
-                {{end}}
-                <a href="/admin" class="block"><img class="w-7 h-7 rounded-full border hover:ring-2 hover:ring-indigo-300 transition" src="{{if .AboutMe.Avatar}}{{.AboutMe.Avatar}}{{else}}https://api.dicebear.com/7.x/adventurer/svg?seed={{defaultName .AboutMe.Name}}{{end}}" alt="user"></a>
-            </div>
-        </div>
-        <form action="/search" method="get" class="flex items-center space-x-2 bg-gray-50 px-3 py-1.5 rounded-xl border border-gray-100">
-            <i class="fa-solid fa-magnifying-glass text-gray-400 text-xs"></i>
-            <input type="text" name="q" placeholder="搜索文章、分类或标签..." class="bg-transparent text-sm w-full outline-none text-gray-600 placeholder-gray-400" value="{{.SearchQuery}}">
-        </form>
-    </div>
-
-    <!-- 移动端遮罩 -->
-    <div id="sidebar-overlay" class="fixed inset-0 bg-black/40 z-50 invisible opacity-0 transition-opacity duration-300 md:hidden"></div>
+{{template "partials/mobile-header" .}}
 
     <!-- ========== 主容器 ========== -->
     <div class="max-w-[1400px] mx-auto px-4 py-6">
-        <div class="grid grid-cols-1 md:grid-cols-4 lg:grid-cols-5 gap-6 items-start">
+        <div class="tri-scroll-layout grid grid-cols-1 md:grid-cols-4 lg:grid-cols-5 gap-6 items-start">
 
-            <!-- ==================== 左侧栏 ==================== -->
-            <aside id="sidebar" class="fixed top-0 left-0 bottom-0 w-72 bg-white p-6 z-50 transform -translate-x-full transition-transform duration-300 ease-in-out md:relative md:translate-x-0 md:w-auto md:p-6 md:rounded-3xl md:shadow-xs md:border md:border-gray-100/50 space-y-6 flex flex-col justify-between overflow-y-auto md:overflow-y-visible no-scrollbar h-screen md:h-auto">
-
-                <div class="space-y-6">
-                    <div class="flex items-center justify-between md:hidden pb-2 border-b border-gray-50">
-                        <span class="font-bold text-gray-400 text-xs tracking-wider">导航菜单</span>
-                        <button id="close-sidebar" class="text-gray-400 hover:text-gray-600 p-1 text-lg"><i class="fa-solid fa-xmark"></i></button>
-                    </div>
-                    <div class="flex items-center space-x-3 px-2">
-                        <div class="w-10 h-10 bg-indigo-600 rounded-xl flex items-center justify-center text-white font-bold text-xl shadow-md shadow-indigo-200">U</div>
-                        <div>
-                            <h1 class="text-lg font-bold tracking-tight">{{.SiteTitle}}</h1>
-                            <p class="text-xs text-gray-400">{{.SiteSubtitle}}</p>
-                        </div>
-                    </div>
-
-                    <nav class="space-y-1">
-                        {{range .Menus}}
-                        <a href="{{if eq .URL ""}}/{{else}}{{.URL}}{{end}}" class="flex items-center space-x-3 px-4 py-3 text-gray-600 hover:bg-gray-50 hover:text-indigo-600 font-medium rounded-xl transition">
-                            {{if .Icon}}<i class="{{.Icon}} text-sm"></i>{{end}} <span>{{.Name}}</span>
-                        </a>
-                        {{end}}
-                    </nav>
-
-                    <div class="space-y-3">
-                        <h3 class="text-xs font-bold text-gray-400 px-1 tracking-wider">站点统计</h3>
-                        <div class="grid grid-cols-2 gap-3 text-sm">
-                            <div class="bg-gray-50 p-2.5 rounded-xl"><p class="text-xs text-gray-400">文章数</p><p class="text-base font-bold mt-0.5">{{.Stats.PostCount}}</p></div>
-                            <div class="bg-gray-50 p-2.5 rounded-xl"><p class="text-xs text-gray-400">分类数</p><p class="text-base font-bold mt-0.5">{{.Stats.CategoryCount}}</p></div>
-                            <div class="bg-gray-50 p-2.5 rounded-xl"><p class="text-xs text-gray-400">标签数</p><p class="text-base font-bold mt-0.5">{{.Stats.TagCount}}</p></div>
-                            <div class="bg-gray-50 p-2.5 rounded-xl"><p class="text-xs text-gray-400">评论数</p><p class="text-base font-bold mt-0.5">{{.Stats.CommentCount}}</p></div>
-                        </div>
-                        <div class="bg-gray-50 p-2.5 rounded-xl flex justify-between items-center text-sm">
-                            <span class="text-xs text-gray-400">访问量</span>
-                            <span class="font-bold">{{.Stats.TotalViews}}</span>
-                        </div>
-                    </div>
-                </div>
-
-                <!-- 建站计时 -->
-                <div id="site-uptime" data-founded="{{.SiteFoundedAt}}">
-                    <h3 class="text-xs font-bold text-gray-400 px-1 tracking-wider mb-2">本站已运行</h3>
-                    <div class="bg-white rounded-xl px-3 py-2.5 flex items-baseline justify-center gap-0.5 font-mono text-lg tracking-tight border border-gray-100">
-                        <span id="site-uptime-d" class="text-indigo-600 font-bold">0</span><span class="text-gray-400 text-xs mr-1">天</span>
-                        <span id="site-uptime-h" class="text-indigo-600 font-bold">00</span><span class="text-gray-300 animate-pulse">:</span>
-                        <span id="site-uptime-m" class="text-indigo-600 font-bold">00</span><span class="text-gray-300 animate-pulse">:</span>
-                        <span id="site-uptime-s" class="text-indigo-600 font-bold">00</span>
-                    </div>
-                </div>
-
-                <footer class="text-center text-xs text-gray-400 space-y-2 pt-6 border-t border-gray-50">
-                    <p>&copy; 2026 {{.SiteTitle}}</p>
-                    <p class="text-[10px]">Powered by UniFlow</p>
-                </footer>
-            </aside>
-
+            {{template "partials/sidebar" .}}
             <!-- ==================== 中间主内容 ==================== -->
-            <main class="col-span-1 md:col-span-3 lg:col-span-4 space-y-6">
+            <main class="tri-scroll-column col-span-1 md:col-span-3 lg:col-span-3 space-y-6">
 
-                <!-- 搜索栏（大屏） -->
-                <div class="hidden md:flex bg-white rounded-2xl p-3 shadow-xs border border-gray-100/50 items-center justify-between">
-                    <form action="/search" method="get" class="flex items-center space-x-3 flex-1 max-w-lg bg-gray-50 px-4 py-2 rounded-xl border border-gray-100">
-                        <i class="fa-solid fa-magnifying-glass text-gray-400 text-sm"></i>
-                        <input type="text" name="q" placeholder="搜索文章、分类或标签..." class="bg-transparent text-sm w-full outline-none text-gray-600 placeholder-gray-400" value="{{.SearchQuery}}">
-                    </form>
-                    <div class="flex items-center space-x-4 pl-4">
-                        {{if .SiteNotification}}
-                        <button onclick="toggleNotification()" class="text-gray-500 hover:text-indigo-600 transition relative"><i class="fa-regular fa-bell text-lg"></i><span class="absolute top-0 right-0 w-1.5 h-1.5 bg-red-500 rounded-full animate-pulse"></span></button>
-                        {{else}}
-                        <button class="text-gray-300 cursor-default relative"><i class="fa-regular fa-bell text-lg"></i></button>
-                        {{end}}
-                        <a href="/admin" class="block"><img class="w-8 h-8 rounded-full border hover:ring-2 hover:ring-indigo-300 transition" src="{{if .AboutMe.Avatar}}{{.AboutMe.Avatar}}{{else}}https://api.dicebear.com/7.x/adventurer/svg?seed={{defaultName .AboutMe.Name}}{{end}}" alt="user"></a>
-                    </div>
-                </div>
+                {{template "partials/searchbar" .}}
 
             <!-- ====== Banner + 热力图悬浮窗 ====== -->
             <div class="relative overflow-hidden rounded-3xl shadow-sm">
                 <a href="{{if .TopPost}}/post/{{.TopPost.ID}}{{else}}/#{{end}}" class="block relative group cursor-pointer h-48 sm:h-56 lg:h-64">
-                    <img class="w-full h-full object-cover transition duration-700 group-hover:scale-105 absolute inset-0"
-                         src="{{if .BannerURL}}{{.BannerURL}}{{else if and .TopPost .TopPost.ThumbURL}}{{.TopPost.ThumbURL}}{{else}}https://picsum.photos/1200/400?random=10{{end}}" alt="banner">
+                    <img loading="lazy" class="w-full h-full object-cover transition duration-700 group-hover:scale-105 absolute inset-0"
+                         src="{{if safeImageURL .BannerURL}}{{safeImageURL .BannerURL}}{{else if and .TopPost (safeImageURL .TopPost.ThumbURL)}}{{safeImageURL .TopPost.ThumbURL}}{{else}}https://picsum.photos/1200/400?random=10{{end}}" alt="banner">
                     <div class="relative z-10 absolute inset-x-0 top-0 bg-gradient-to-b from-black/60 to-transparent p-4 lg:p-5 flex flex-col items-start text-white">
                         {{if .TopPost}}<span class="bg-indigo-600 text-[10px] uppercase font-bold tracking-wider px-2 py-0.5 rounded-md w-fit mb-1.5">置顶</span>{{end}}
                         <h2 class="text-lg lg:text-xl font-bold mb-1 line-clamp-1">{{if .TopPost}}{{.TopPost.Title}}{{end}}</h2>
@@ -237,9 +162,16 @@
                 </div>
             </div>
 
+            <!-- 面包屑 -->
+            <div class="flex items-center gap-1.5 text-sm text-gray-500">
+                <a href="/" class="hover:text-indigo-500 transition">首页</a>
+                <i class="fa-solid fa-chevron-right text-[10px] text-gray-400"></i>
+                <span class="text-gray-900 font-medium">留言板</span>
+            </div>
+
             <!-- 页面标题 -->
             <div class="flex items-center space-x-3">
-                <div class="w-1 h-6 bg-indigo-400 rounded-full"></div>
+                <div class="w-1.5 h-6 bg-indigo-400 rounded-full"></div>
                 <h2 class="text-lg font-bold text-gray-800">留言板</h2>
                 <span class="text-xs text-gray-400">说你想说的，留下你的足迹</span>
             </div>
@@ -250,7 +182,7 @@
                 <div class="absolute inset-0 bg-[radial-gradient(circle_at_20%_15%,rgba(99,102,241,0.10),transparent_28%),radial-gradient(circle_at_85%_70%,rgba(236,72,153,0.08),transparent_30%)] pointer-events-none"></div>
                 <div class="guestbook-marquee-lane" style="--lane-top: 24px; --marquee-duration: 78s;">
                     {{range .MarqueeGuestbooks}}
-                    <div class="guestbook-marquee-bubble inline-flex items-center gap-2 bg-white dark:bg-gray-800 px-5 py-2 rounded-full shadow-md text-sm text-gray-700 dark:text-gray-200 border {{if or (eq .Author "站长") (eq .Author $.AboutMe.Name)}}border-indigo-300 dark:border-indigo-500 shadow-indigo-100/70{{else}}border-gray-100 dark:border-gray-700{{end}}">
+                    <div class="guestbook-marquee-bubble inline-flex items-center gap-2 px-5 py-2 rounded-full shadow-md text-sm text-gray-700 dark:text-gray-200">
                         <span class="guestbook-marquee-text">👤 {{.Author}}：{{.Content}}</span>
                         <span class="text-gray-400 dark:text-gray-500">· ⏱️{{.CreatedAt.Format "01-02 15:04"}}</span>
                     </div>
@@ -259,7 +191,7 @@
 
                 <div class="guestbook-marquee-lane" style="--lane-top: 78px; --marquee-duration: 88s;">
                     {{range .MarqueeGuestbooks}}
-                    <div class="guestbook-marquee-bubble inline-flex items-center gap-2 bg-white dark:bg-gray-800 px-5 py-2 rounded-full shadow-md text-sm text-gray-700 dark:text-gray-200 border {{if or (eq .Author "站长") (eq .Author $.AboutMe.Name)}}border-indigo-300 dark:border-indigo-500 shadow-indigo-100/70{{else}}border-gray-100 dark:border-gray-700{{end}}">
+                    <div class="guestbook-marquee-bubble inline-flex items-center gap-2 px-5 py-2 rounded-full shadow-md text-sm text-gray-700 dark:text-gray-200">
                         <span class="guestbook-marquee-text">👤 {{.Author}}：{{.Content}}</span>
                         <span class="text-gray-400 dark:text-gray-500">· ⏱️{{.CreatedAt.Format "01-02 15:04"}}</span>
                     </div>
@@ -268,7 +200,7 @@
 
                 <div class="guestbook-marquee-lane" style="--lane-top: 132px; --marquee-duration: 82s;">
                     {{range .MarqueeGuestbooks}}
-                    <div class="guestbook-marquee-bubble inline-flex items-center gap-2 bg-white dark:bg-gray-800 px-5 py-2 rounded-full shadow-md text-sm text-gray-700 dark:text-gray-200 border {{if or (eq .Author "站长") (eq .Author $.AboutMe.Name)}}border-indigo-300 dark:border-indigo-500 shadow-indigo-100/70{{else}}border-gray-100 dark:border-gray-700{{end}}">
+                    <div class="guestbook-marquee-bubble inline-flex items-center gap-2 px-5 py-2 rounded-full shadow-md text-sm text-gray-700 dark:text-gray-200">
                         <span class="guestbook-marquee-text">👤 {{.Author}}：{{.Content}}</span>
                         <span class="text-gray-400 dark:text-gray-500">· ⏱️{{.CreatedAt.Format "01-02 15:04"}}</span>
                     </div>
@@ -277,7 +209,7 @@
 
                 <div class="guestbook-marquee-lane" style="--lane-top: 186px; --marquee-duration: 96s;">
                     {{range .MarqueeGuestbooks}}
-                    <div class="guestbook-marquee-bubble inline-flex items-center gap-2 bg-white dark:bg-gray-800 px-5 py-2 rounded-full shadow-md text-sm text-gray-700 dark:text-gray-200 border {{if or (eq .Author "站长") (eq .Author $.AboutMe.Name)}}border-indigo-300 dark:border-indigo-500 shadow-indigo-100/70{{else}}border-gray-100 dark:border-gray-700{{end}}">
+                    <div class="guestbook-marquee-bubble inline-flex items-center gap-2 px-5 py-2 rounded-full shadow-md text-sm text-gray-700 dark:text-gray-200">
                         <span class="guestbook-marquee-text">👤 {{.Author}}：{{.Content}}</span>
                         <span class="text-gray-400 dark:text-gray-500">· ⏱️{{.CreatedAt.Format "01-02 15:04"}}</span>
                     </div>
@@ -286,7 +218,7 @@
 
                 <div class="guestbook-marquee-lane" style="--lane-top: 240px; --marquee-duration: 84s;">
                     {{range .MarqueeGuestbooks}}
-                    <div class="guestbook-marquee-bubble inline-flex items-center gap-2 bg-white dark:bg-gray-800 px-5 py-2 rounded-full shadow-md text-sm text-gray-700 dark:text-gray-200 border {{if or (eq .Author "站长") (eq .Author $.AboutMe.Name)}}border-indigo-300 dark:border-indigo-500 shadow-indigo-100/70{{else}}border-gray-100 dark:border-gray-700{{end}}">
+                    <div class="guestbook-marquee-bubble inline-flex items-center gap-2 px-5 py-2 rounded-full shadow-md text-sm text-gray-700 dark:text-gray-200">
                         <span class="guestbook-marquee-text">👤 {{.Author}}：{{.Content}}</span>
                         <span class="text-gray-400 dark:text-gray-500">· ⏱️{{.CreatedAt.Format "01-02 15:04"}}</span>
                     </div>
@@ -295,7 +227,7 @@
 
                 <div class="guestbook-marquee-lane" style="--lane-top: 294px; --marquee-duration: 92s;">
                     {{range .MarqueeGuestbooks}}
-                    <div class="guestbook-marquee-bubble inline-flex items-center gap-2 bg-white dark:bg-gray-800 px-5 py-2 rounded-full shadow-md text-sm text-gray-700 dark:text-gray-200 border {{if or (eq .Author "站长") (eq .Author $.AboutMe.Name)}}border-indigo-300 dark:border-indigo-500 shadow-indigo-100/70{{else}}border-gray-100 dark:border-gray-700{{end}}">
+                    <div class="guestbook-marquee-bubble inline-flex items-center gap-2 px-5 py-2 rounded-full shadow-md text-sm text-gray-700 dark:text-gray-200">
                         <span class="guestbook-marquee-text">👤 {{.Author}}：{{.Content}}</span>
                         <span class="text-gray-400 dark:text-gray-500">· ⏱️{{.CreatedAt.Format "01-02 15:04"}}</span>
                     </div>
@@ -304,7 +236,7 @@
 
                 <div class="guestbook-marquee-lane" style="--lane-top: 348px; --marquee-duration: 100s;">
                     {{range .MarqueeGuestbooks}}
-                    <div class="guestbook-marquee-bubble inline-flex items-center gap-2 bg-white dark:bg-gray-800 px-5 py-2 rounded-full shadow-md text-sm text-gray-700 dark:text-gray-200 border {{if or (eq .Author "站长") (eq .Author $.AboutMe.Name)}}border-indigo-300 dark:border-indigo-500 shadow-indigo-100/70{{else}}border-gray-100 dark:border-gray-700{{end}}">
+                    <div class="guestbook-marquee-bubble inline-flex items-center gap-2 px-5 py-2 rounded-full shadow-md text-sm text-gray-700 dark:text-gray-200">
                         <span class="guestbook-marquee-text">👤 {{.Author}}：{{.Content}}</span>
                         <span class="text-gray-400 dark:text-gray-500">· ⏱️{{.CreatedAt.Format "01-02 15:04"}}</span>
                     </div>
@@ -319,13 +251,13 @@
                     <div class="flex flex-col sm:flex-row gap-2.5">
                         <div class="flex-1">
                             <label class="text-[11px] font-medium text-gray-500 mb-1 block">昵称 <span class="text-red-400">*</span></label>
-                            <input id="gb-author" type="text" maxlength="30" required placeholder="你的昵称" class="w-full px-3 py-2 text-xs border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent bg-gray-50">
+                            <input id="gb-author" type="text" minlength="3" maxlength="10" required placeholder="3-10个字" class="w-full px-3 py-2 text-xs border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent bg-gray-50">
                         </div>
                     </div>
                     <div>
                         <label class="text-[11px] font-medium text-gray-500 mb-1 block">留言内容 <span class="text-red-400">*</span></label>
                         <textarea id="gb-content" rows="2" maxlength="500" required placeholder="写下你的留言吧..." class="w-full px-3 py-2 text-xs border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent bg-gray-50 resize-none"></textarea>
-                        <div class="flex justify-end mt-1"><span id="gb-char-count" class="text-[10px] text-gray-400">0/500</span></div>
+                        <div class="flex justify-end mt-1"><span id="gb-char-count" class="text-[11px] text-gray-400">0/500</span></div>
                     </div>
                     <div class="flex justify-end">
                         <button type="submit" id="gb-submit" class="bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-medium px-5 py-2 rounded-lg transition active:scale-95 shadow-sm">
@@ -354,13 +286,14 @@
                             <div class="mt-2 rounded-xl bg-indigo-50 border border-indigo-100 px-3 py-2 text-xs text-indigo-700">
                                 <div class="font-semibold mb-1">站长回复</div>
                                 <p class="leading-relaxed whitespace-pre-wrap">{{.AdminReply}}</p>
-                                {{if .RepliedAt}}<div class="mt-1 text-[10px] text-indigo-300">{{.RepliedAt.Format "2006-01-02 15:04"}}</div>{{end}}
+                                {{if .RepliedAt}}<div class="mt-1 text-[11px] text-indigo-300">{{.RepliedAt.Format "2006-01-02 15:04"}}</div>{{end}}
                             </div>
                             {{end}}
-                            {{if .ImageURL}}
+                            {{$imageURL := safeURL .ImageURL}}
+                            {{if $imageURL}}
                             <div class="mt-2">
-                                <a href="{{.ImageURL}}" class="glightbox" data-gallery="guestbook">
-                                    <img src="{{.ImageURL}}" alt="留言图片" class="max-w-[220px] max-h-36 rounded-lg object-cover" loading="lazy">
+                                <a href="{{$imageURL}}" class="glightbox" data-gallery="guestbook">
+                                    <img loading="lazy" src="{{$imageURL}}" alt="留言图片" class="max-w-[220px] max-h-36 rounded-lg object-cover" loading="lazy">
                                 </a>
                             </div>
                             {{end}}
@@ -398,91 +331,54 @@
             {{end}}
             </main>
 
+            {{template "partials/rightbar" .}}
         </div>
     </div>
 
-    <script src="https://cdn.jsdelivr.net/npm/glightbox@3.3.0/dist/js/glightbox.min.js"></script>
+    <script src="/static/vendor/glightbox/glightbox.min.js"></script>
     <script>
-        // 通知弹窗
-        function toggleNotification() {
-            var panel = document.getElementById('notification-panel');
-            if (!panel) return;
-            var isOpen = panel.style.display !== 'none' && panel.style.opacity === '1';
-            if (isOpen) {
-                panel.style.opacity = '0';
-                panel.style.transform = 'translateX(20px)';
-                setTimeout(function() { panel.style.display = 'none'; }, 300);
-            } else {
-                panel.style.display = 'block';
-                setTimeout(function() {
-                    panel.style.opacity = '1';
-                    panel.style.transform = 'translateX(0)';
-                }, 10);
-            }
-        }
-        document.addEventListener('click', function(e) {
-            var panel = document.getElementById('notification-panel');
-            if (!panel) return;
-            var bellBtn = e.target.closest('[onclick="toggleNotification()"]');
-            if (!bellBtn && !panel.contains(e.target) && panel.style.opacity === '1') {
-                panel.style.opacity = '0';
-                panel.style.transform = 'translateX(20px)';
-                setTimeout(function() { panel.style.display = 'none'; }, 300);
-            }
-        });
-
-        // 侧边栏
-        var openBtn = document.getElementById('open-sidebar');
-        var closeBtn = document.getElementById('close-sidebar');
-        var sidebar = document.getElementById('sidebar');
-        var overlay = document.getElementById('sidebar-overlay');
-
-        function toggleSidebar(open) {
-            if (open) {
-                sidebar.classList.remove('-translate-x-full');
-                overlay.classList.remove('invisible', 'opacity-0');
-                overlay.classList.add('opacity-100');
-                document.body.classList.add('overflow-hidden');
-            } else {
-                sidebar.classList.add('-translate-x-full');
-                overlay.classList.remove('opacity-100');
-                overlay.classList.add('opacity-0');
-                setTimeout(function() { overlay.classList.add('invisible'); }, 300);
-                document.body.classList.remove('overflow-hidden');
-            }
-        }
-        if (openBtn) openBtn.addEventListener('click', function() { toggleSidebar(true); });
-        if (closeBtn) closeBtn.addEventListener('click', function() { toggleSidebar(false); });
-        if (overlay) overlay.addEventListener('click', function() { toggleSidebar(false); });
-
-        // 留言弹幕错落渲染
+        // 留言弹幕错落渲染 —— 每一条独立随机进入时间和速度
         (function() {
             var lanes = document.querySelectorAll('.guestbook-marquee-lane');
             if (!lanes.length) return;
 
             lanes.forEach(function(lane, laneIndex) {
                 var bubbles = lane.querySelectorAll('.guestbook-marquee-bubble');
-                var laneDuration = parseFloat(getComputedStyle(lane).getPropertyValue('--marquee-duration')) || 84;
-                var baseGap = Math.max(3.6, laneDuration / Math.max(bubbles.length, 1));
+                if (!bubbles.length) return;
 
                 bubbles.forEach(function(bubble, index) {
                     var measuredWidth = Math.ceil(bubble.getBoundingClientRect().width || 360);
-                    var staggerSeed = (index * 37 + laneIndex * 19) % 17;
-                    var delayNoise = ((staggerSeed % 7) * 0.38) + (laneIndex % 3) * 0.52;
-                    var startGap = 24 + ((index * 29 + laneIndex * 43) % 92);
-                    var verticalOffset = ((index * 11 + laneIndex * 7) % 17) - 8;
-                    var laneOffset = laneIndex * 1.35;
-                    var negativeDelay = -((index * baseGap) + delayNoise + laneIndex * 2.7) % laneDuration;
-                    var distance = -(window.innerWidth + measuredWidth + startGap + 180);
+
+                    // 每条泡随机出场延迟：0 ~ 40 秒之间
+                    var randomDelay = -(Math.random() * 40).toFixed(2);
+
+                    // 每条泡随机飘动时长：40 ~ 120 秒之间
+                    var randomDuration = (40 + Math.random() * 80).toFixed(1);
+
+                    // 每条泡随机垂直偏移：-6px ~ 6px
+                    var verticalOffset = ((Math.random() * 12) - 6).toFixed(1);
+
+                    // 随机起始位置：20px ~ 120px
+                    var startGap = (20 + Math.random() * 100).toFixed(0);
+
+                    // 飘过距离
+                    var distance = -(window.innerWidth + measuredWidth + parseInt(startGap) + 180);
 
                     bubble.style.setProperty('--bubble-measured-width', measuredWidth + 'px');
                     bubble.style.setProperty('--bubble-start', startGap + 'px');
-                    bubble.style.setProperty('--bubble-y', (verticalOffset + laneOffset) + 'px');
-                    bubble.style.setProperty('--bubble-delay', negativeDelay.toFixed(2) + 's');
+                    bubble.style.setProperty('--bubble-y', verticalOffset + 'px');
+                    bubble.style.setProperty('--bubble-delay', randomDelay + 's');
+                    bubble.style.setProperty('--marquee-duration', randomDuration + 's');
                     bubble.style.setProperty('--marquee-distance', distance + 'px');
                 });
             });
         })();
+
+        function escapeHtml(value) {
+            return String(value || '').replace(/[&<>"']/g, function(ch) {
+                return ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'})[ch];
+            });
+        }
 
         // 留言提交
         var gbForm = document.getElementById('guestbook-form');
@@ -499,6 +395,11 @@
             var author = document.getElementById('gb-author').value.trim();
             var content = gbContent.value.trim();
             if (!author || !content) return;
+            var authorLen = [...author].length;
+            if (authorLen < 3 || authorLen > 10) {
+                alert('昵称需要 3-10 个字');
+                return;
+            }
 
             gbSubmitBtn.disabled = true;
             gbSubmitBtn.innerHTML = '<i class="fa-solid fa-spinner fa-spin mr-1.5"></i>提交中...';
@@ -519,11 +420,13 @@
                         var card = document.createElement('div');
                         card.className = 'bg-white rounded-2xl p-5 shadow-xs border border-gray-100/50 hover:shadow-md transition';
                         card.style.animation = 'fadeIn 0.4s ease';
+                        var safeAuthor = escapeHtml(author);
+                        var safeContent = escapeHtml(content);
                         card.innerHTML = '<div class="flex items-start space-x-3">' +
-                            '<div class="w-10 h-10 rounded-full bg-gradient-to-br from-indigo-400 to-purple-500 flex items-center justify-center text-white font-bold text-sm shrink-0">' + author.charAt(0) + '</div>' +
+                            '<div class="w-10 h-10 rounded-full bg-gradient-to-br from-indigo-400 to-purple-500 flex items-center justify-center text-white font-bold text-sm shrink-0">' + escapeHtml(author.charAt(0)) + '</div>' +
                             '<div class="flex-1 min-w-0">' +
-                            '<div class="flex items-center space-x-2 mb-2"><span class="text-sm font-semibold text-gray-800">' + author + '</span><span class="text-[10px] text-gray-400">' + dateStr + '</span></div>' +
-                            '<p class="text-sm text-gray-700 leading-relaxed whitespace-pre-wrap">' + content.replace(/</g,'&lt;').replace(/>/g,'&gt;') + '</p>' +
+                            '<div class="flex items-center space-x-2 mb-2"><span class="text-sm font-semibold text-gray-800">' + safeAuthor + '</span><span class="text-[11px] text-gray-400">' + dateStr + '</span></div>' +
+                            '<p class="text-sm text-gray-700 leading-relaxed whitespace-pre-wrap">' + safeContent + '</p>' +
                             '</div></div>';
                         list.insertBefore(card, list.firstChild);
                     } else {
@@ -575,6 +478,7 @@
         (function() {
             var heatmapType = 'all';
             var heatmapLabel = '📊 全局动态热力看板';
+            var cacheKey = 'heatmap_' + heatmapType;
             var labelEl = document.getElementById('heatmap-label');
             if (labelEl) labelEl.textContent = heatmapLabel;
 
@@ -586,86 +490,75 @@
                 return 'rgba(74,222,128,0.95)';
             }
 
+            function renderHeatmap(data, total, active) {
+                var map = {}, now = new Date(), today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+                for (var i = 0; i < data.length; i++) { map[data[i].date] = data[i].count; }
+                var startDate = new Date(today);
+                startDate.setDate(startDate.getDate() - 364);
+                var dayOff = startDate.getDay();
+                startDate.setDate(startDate.getDate() - dayOff);
+                var weeks = [], week = [], cur = new Date(startDate);
+                while (cur <= today || week.length > 0) {
+                    var ds = cur.getFullYear()+'-'+String(cur.getMonth()+1).padStart(2,'0')+'-'+String(cur.getDate()).padStart(2,'0');
+                    week.push({date:ds, count:map[ds]||0});
+                    if (week.length === 7) { weeks.push(week); week = []; }
+                    cur.setDate(cur.getDate()+1);
+                }
+                if (week.length > 0) weeks.push(week);
+                var html = '';
+                var grid = document.getElementById('heatmap-grid');
+                var cellSize = 9;
+                if (grid) {
+                    var availW = grid.parentElement.clientWidth - 8;
+                    cellSize = Math.max(3, Math.floor((availW - weeks.length) / weeks.length));
+                }
+                var cellGap = cellSize > 5 ? 1 : 0;
+                for (var w = 0; w < weeks.length; w++) {
+                    html += '<div style="display:flex;flex-direction:column;gap:'+cellGap+'px;">';
+                    for (var d = 0; d < weeks[w].length; d++) {
+                        var c = weeks[w][d];
+                        html += '<div title="'+c.date+': '+c.count+' 条" style="width:'+cellSize+'px;height:'+cellSize+'px;border-radius:2px;background:'+getColor(c.count)+';cursor:pointer;transition:transform 0.1s" onmouseenter="this.style.transform=\'scale(1.5)\'" onmouseleave="this.style.transform=\'scale(1)\'"></div>';
+                    }
+                    html += '</div>';
+                }
+                if (grid) grid.innerHTML = html;
+                var summary = document.getElementById('heatmap-summary');
+                if (summary) summary.textContent = total + ' 条，活跃 ' + active + ' 天';
+            }
+
+            // 先从 sessionStorage 恢复（跨页面无闪烁）
+            var cached = sessionStorage.getItem(cacheKey);
+            if (!cached) {
+                var fallbackKeys = ['heatmap_all', 'heatmap_moments', 'heatmap_posts'];
+                for (var i = 0; i < fallbackKeys.length; i++) {
+                    if (fallbackKeys[i] !== cacheKey) {
+                        var fb = sessionStorage.getItem(fallbackKeys[i]);
+                        if (fb) { cached = fb; break; }
+                    }
+                }
+            }
+            if (cached) {
+                try {
+                    var cd = JSON.parse(cached);
+                    renderHeatmap(cd.data, cd.total, cd.active);
+                } catch(e) {}
+            }
+
             fetch('/api/stats/heatmap?type=' + heatmapType)
                 .then(function(r) { return r.json(); })
                 .then(function(res) {
                     if (!res.ok) return;
-                    var data = res.data, map = {}, total = 0, active = 0;
-                    for (var i = 0; i < data.length; i++) {
-                        map[data[i].date] = data[i].count;
-                        total += data[i].count;
-                        if (data[i].count > 0) active++;
-                    }
-                    var now = new Date(), today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
-                    var startDate = new Date(today);
-                    startDate.setDate(startDate.getDate() - 364);
-                    var dayOff = startDate.getDay();
-                    startDate.setDate(startDate.getDate() - dayOff);
-                    var weeks = [], week = [], cur = new Date(startDate);
-                    while (cur <= today || week.length > 0) {
-                        var ds = cur.getFullYear()+'-'+String(cur.getMonth()+1).padStart(2,'0')+'-'+String(cur.getDate()).padStart(2,'0');
-                        week.push({date:ds, count:map[ds]||0});
-                        if (week.length === 7) { weeks.push(week); week = []; }
-                        cur.setDate(cur.getDate()+1);
-                    }
-                    if (week.length > 0) weeks.push(week);
-                    var html = '';
-                    var grid = document.getElementById('heatmap-grid');
-                    var cellSize = 9;
-                    if (grid) {
-                        var availW = grid.parentElement.clientWidth - 8;
-                        cellSize = Math.max(3, Math.floor((availW - weeks.length) / weeks.length));
-                    }
-                    var cellGap = cellSize > 5 ? 1 : 0;
-                    for (var w = 0; w < weeks.length; w++) {
-                        html += '<div style="display:flex;flex-direction:column;gap:'+cellGap+'px;">';
-                        for (var d = 0; d < weeks[w].length; d++) {
-                            var c = weeks[w][d];
-                            html += '<div title="'+c.date+': '+c.count+' 条" style="width:'+cellSize+'px;height:'+cellSize+'px;border-radius:2px;background:'+getColor(c.count)+';cursor:pointer;transition:transform 0.1s" onmouseenter="this.style.transform=\'scale(1.5)\'" onmouseleave="this.style.transform=\'scale(1)\'"></div>';
-                        }
-                        html += '</div>';
-                    }
-                    if (grid) grid.innerHTML = html;
-                    var summary = document.getElementById('heatmap-summary');
-                    if (summary) summary.textContent = total + ' 条，活跃 ' + active + ' 天';
+                    var data = res.data, total = 0, active = 0;
+                    for (var i = 0; i < data.length; i++) { total += data[i].count; if (data[i].count > 0) active++; }
+                    try { sessionStorage.setItem(cacheKey, JSON.stringify({data: data, total: total, active: active})); } catch(e) {}
+                    renderHeatmap(data, total, active);
                 })
                 .catch(function() {
                     var s = document.getElementById('heatmap-summary');
                     if (s) s.textContent = '加载失败';
                 });
         })();
-
-        // Site uptime counter
-        (function() {
-            var el = document.getElementById('site-uptime');
-            if (!el) return;
-            var founded = el.getAttribute('data-founded');
-            if (!founded) return;
-            var foundedDate = new Date(founded);
-            if (isNaN(foundedDate.getTime())) return;
-            function update() {
-                var now = new Date();
-                var diff = now - foundedDate;
-                var days = Math.floor(diff / 86400000);
-                var hours = Math.floor((diff % 86400000) / 3600000);
-                var minutes = Math.floor((diff % 3600000) / 60000);
-                var seconds = Math.floor((diff % 60000) / 1000);
-                var daysEl = document.getElementById('site-uptime-d');
-                var hoursEl = document.getElementById('site-uptime-h');
-                var minutesEl = document.getElementById('site-uptime-m');
-                var secondsEl = document.getElementById('site-uptime-s');
-                if (daysEl) daysEl.textContent = days;
-                if (hoursEl) hoursEl.textContent = String(hours).padStart(2,'0');
-                if (minutesEl) minutesEl.textContent = String(minutes).padStart(2,'0');
-                if (secondsEl) secondsEl.textContent = String(seconds).padStart(2,'0');
-            }
-            update();
-            setInterval(update, 1000);
-        })();
     </script>
-<script>
-    (function(){var p=location.pathname;document.querySelectorAll('nav a').forEach(function(a){var h=a.getAttribute('href');if(h===p||(p!=='/'&&h!=='/'&&p.startsWith(h))){a.classList.add('text-indigo-600','font-semibold');}});})();
-</script>
-<script>(function(){var b=document.createElement('div');b.id='back-to-top';b.innerHTML='<span class="iconify" data-icon="mdi:chevron-up" data-width="20"></span>';document.body.appendChild(b);b.addEventListener('click',function(){window.scrollTo({top:0,behavior:'smooth'})});var t=false;window.addEventListener('scroll',function(){if(!t){requestAnimationFrame(function(){b.classList.toggle('show',window.scrollY>window.innerHeight);t=false});t=true}},{passive:true})})();</script>
+{{template "partials/footer-scripts" .}}
 </body>
 </html>

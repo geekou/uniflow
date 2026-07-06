@@ -30,9 +30,9 @@ func StatsHeatmapHandler(db *sql.DB) gin.HandlerFunc {
 
 		if typ == "all" {
 			posts, err1 := queryDailyCounts(db,
-				"SELECT DATE(COALESCE(updated_at, created_at)), COUNT(*) FROM posts WHERE status='published' AND privacy='public' AND DATE(COALESCE(updated_at, created_at)) >= ? GROUP BY DATE(COALESCE(updated_at, created_at))", since)
+				"SELECT DATE(created_at), COUNT(*) FROM posts WHERE status='published' AND privacy='public' AND DATE(created_at) >= ? GROUP BY DATE(created_at)", since)
 			moments, err2 := queryDailyCounts(db,
-				"SELECT DATE(COALESCE(updated_at, created_at)), COUNT(*) FROM moments WHERE DATE(COALESCE(updated_at, created_at)) >= ? GROUP BY DATE(COALESCE(updated_at, created_at))", since)
+				"SELECT DATE(created_at), COUNT(*) FROM moments WHERE DATE(created_at) >= ? GROUP BY DATE(created_at)", since)
 
 			if err1 != nil && err2 != nil {
 				c.JSON(http.StatusInternalServerError, gin.H{"ok": false, "msg": "查询失败"})
@@ -54,9 +54,9 @@ func StatsHeatmapHandler(db *sql.DB) gin.HandlerFunc {
 
 		var sqlStr string
 		if typ == "posts" {
-			sqlStr = "SELECT DATE(COALESCE(updated_at, created_at)), COUNT(*) FROM posts WHERE status='published' AND privacy='public' AND DATE(COALESCE(updated_at, created_at)) >= ? GROUP BY DATE(COALESCE(updated_at, created_at))"
+			sqlStr = "SELECT DATE(created_at), COUNT(*) FROM posts WHERE status='published' AND privacy='public' AND DATE(created_at) >= ? GROUP BY DATE(created_at)"
 		} else {
-			sqlStr = "SELECT DATE(COALESCE(updated_at, created_at)), COUNT(*) FROM moments WHERE DATE(COALESCE(updated_at, created_at)) >= ? GROUP BY DATE(COALESCE(updated_at, created_at))"
+			sqlStr = "SELECT DATE(created_at), COUNT(*) FROM moments WHERE DATE(created_at) >= ? GROUP BY DATE(created_at)"
 		}
 
 		result, err := queryDailyCounts(db, sqlStr, since)
@@ -83,11 +83,11 @@ func queryDailyCounts(db *sql.DB, sqlStr string, args ...interface{}) ([]Heatmap
 	for rows.Next() {
 		var dp HeatmapDataPoint
 		if err := rows.Scan(&dp.Date, &dp.Count); err != nil {
-			continue
+			return nil, err
 		}
 		result = append(result, dp)
 	}
-	return result, nil
+	return result, rows.Err()
 }
 
 // mergeMaps 合并两个按日期排序的 HeatmapDataPoint 切片

@@ -1,4 +1,5 @@
 {{template "admin_head" .}}
+    <link href="/static/vendor/quill/quill.snow.css" rel="stylesheet">
     <div class="flex items-center justify-between mb-6">
         <h2 class="text-lg font-bold">关于我</h2>
     </div>
@@ -14,7 +15,7 @@
                 <div>
                     <label class="text-xs font-medium text-gray-500 mb-1 block">头像</label>
                     <div class="flex items-center gap-3">
-                        <img id="avatar-preview" src="{{if .AboutMe.Avatar}}{{.AboutMe.Avatar}}{{else}}https://api.dicebear.com/7.x/adventurer/svg?seed={{defaultName .AboutMe.Name}}{{end}}" class="w-12 h-12 rounded-full object-cover border shrink-0">
+                        <img loading="lazy" id="avatar-preview" src="{{if safeImageURL .AboutMe.Avatar}}{{safeImageURL .AboutMe.Avatar}}{{else}}https://api.dicebear.com/7.x/adventurer/svg?seed={{defaultName .AboutMe.Name}}{{end}}" class="w-12 h-12 rounded-full object-cover border shrink-0">
                         <div class="flex-1">
                             <input type="file" name="avatar_file" accept="image/*" onchange="previewAvatar(this)" class="w-full text-sm text-gray-500 file:mr-3 file:py-1.5 file:px-3 file:rounded-lg file:border-0 file:text-xs file:font-medium file:bg-indigo-50 file:text-indigo-600 hover:file:bg-indigo-100 file:cursor-pointer">
                             <input type="hidden" name="avatar" value="{{.AboutMe.Avatar}}">
@@ -47,12 +48,27 @@
             <div id="social-links" class="space-y-3">
                 {{range .AboutMe.SocialLinks}}
                 <div class="social-link-row flex items-center gap-3 bg-gray-50 p-3 rounded-xl">
-                    <div class="flex-1 grid grid-cols-3 gap-3">
-                        <input type="text" name="social_name" value="{{.Name}}" placeholder="名称（如 GitHub）" class="border border-gray-200 rounded-lg px-3 py-2 text-xs outline-none focus:ring-2 focus:ring-indigo-200 focus:border-indigo-400">
-                        <input type="text" name="social_url" value="{{.URL}}" placeholder="链接地址" class="border border-gray-200 rounded-lg px-3 py-2 text-xs outline-none focus:ring-2 focus:ring-indigo-200 focus:border-indigo-400">
-                        <input type="text" name="social_icon" value="{{.Icon}}" placeholder="图标类名（如 fa-brands fa-github）" class="border border-gray-200 rounded-lg px-3 py-2 text-xs outline-none focus:ring-2 focus:ring-indigo-200 focus:border-indigo-400">
+                    <div class="flex-1 grid grid-cols-[80px_1fr_1fr_2fr] gap-3">
+                        <input type="number" min="1" name="social_sort" value="{{.Sort}}" placeholder="顺序" class="social-sort border border-gray-200 rounded-lg px-3 py-2 text-xs outline-none focus:ring-2 focus:ring-indigo-200 focus:border-indigo-400">
+                        <select name="social_platform" class="border border-gray-200 rounded-lg px-3 py-2 text-xs outline-none focus:ring-2 focus:ring-indigo-200 focus:border-indigo-400" onchange="syncSocialName(this)">
+                            <option value="custom" {{if eq .Platform "custom"}}selected{{end}}>自定义</option>
+                            <option value="qq" {{if eq .Platform "qq"}}selected{{end}}>QQ</option>
+                            <option value="wechat" {{if eq .Platform "wechat"}}selected{{end}}>微信</option>
+                            <option value="douyin" {{if eq .Platform "douyin"}}selected{{end}}>抖音</option>
+                            <option value="bilibili" {{if eq .Platform "bilibili"}}selected{{end}}>哔哩哔哩</option>
+                            <option value="xiaohongshu" {{if eq .Platform "xiaohongshu"}}selected{{end}}>小红书</option>
+                            <option value="github" {{if eq .Platform "github"}}selected{{end}}>GitHub</option>
+                            <option value="twitter" {{if eq .Platform "twitter"}}selected{{end}}>Twitter</option>
+                            <option value="email" {{if eq .Platform "email"}}selected{{end}}>邮箱</option>
+                        </select>
+                        <input type="text" name="social_name" value="{{.Name}}" placeholder="显示名称" class="border border-gray-200 rounded-lg px-3 py-2 text-xs outline-none focus:ring-2 focus:ring-indigo-200 focus:border-indigo-400">
+                        <input type="text" name="social_url" value="{{.URL}}" placeholder="链接地址（可留空）" class="border border-gray-200 rounded-lg px-3 py-2 text-xs outline-none focus:ring-2 focus:ring-indigo-200 focus:border-indigo-400">
                     </div>
-                    <button type="button" onclick="removeSocialLink(this)" class="text-gray-400 hover:text-red-500 transition text-sm p-1"><i class="fa-solid fa-trash-can"></i></button>
+                    <div class="flex items-center gap-1">
+                        <button type="button" onclick="moveSocialLink(this, -1)" class="text-gray-400 hover:text-indigo-500 transition text-sm p-1" title="上移"><i class="fa-solid fa-arrow-up"></i></button>
+                        <button type="button" onclick="moveSocialLink(this, 1)" class="text-gray-400 hover:text-indigo-500 transition text-sm p-1" title="下移"><i class="fa-solid fa-arrow-down"></i></button>
+                        <button type="button" onclick="removeSocialLink(this)" class="text-gray-400 hover:text-red-500 transition text-sm p-1" title="删除"><i class="fa-solid fa-trash-can"></i></button>
+                    </div>
                 </div>
                 {{end}}
             </div>
@@ -60,6 +76,13 @@
             <div id="no-links-hint" class="text-center py-4 text-xs text-gray-400 {{if .AboutMe.SocialLinks}}hidden{{end}}">
                 <i class="fa-solid fa-link-slash mr-1"></i>暂无社交链接，点击上方按钮添加
             </div>
+        </div>
+
+        <!-- 个人简介（详细） -->
+        <div class="bg-white rounded-2xl p-6 shadow-xs border border-gray-100/50 space-y-3">
+            <h3 class="text-sm font-semibold text-gray-700"><i class="fa-solid fa-align-left mr-1.5 text-indigo-500"></i>个人简介（详细）</h3>
+            <div id="detail-editor" style="height:300px"></div>
+            <textarea name="detail_intro" id="hidden-detail-intro" class="hidden"></textarea>
         </div>
 
         <div class="flex justify-end">
@@ -77,6 +100,32 @@
                 reader.readAsDataURL(input.files[0]);
             }
         }
+        var platformNames = {
+            custom: '自定义',
+            qq: 'QQ',
+            wechat: '微信',
+            douyin: '抖音',
+            bilibili: '哔哩哔哩',
+            xiaohongshu: '小红书',
+            github: 'GitHub',
+            twitter: 'Twitter',
+            email: '邮箱'
+        };
+
+        function socialPlatformOptions(selected) {
+            return Object.keys(platformNames).map(function(key) {
+                return '<option value="' + key + '"' + (key === selected ? ' selected' : '') + '>' + platformNames[key] + '</option>';
+            }).join('');
+        }
+
+        function syncSocialName(select) {
+            var row = select.closest('.social-link-row');
+            var nameInput = row.querySelector('input[name="social_name"]');
+            if (select.value !== 'custom' && (!nameInput.value || platformNames[nameInput.value] === nameInput.value)) {
+                nameInput.value = platformNames[select.value] || '';
+            }
+        }
+
         function addSocialLink() {
             var container = document.getElementById('social-links');
             var hint = document.getElementById('no-links-hint');
@@ -84,13 +133,37 @@
 
             var row = document.createElement('div');
             row.className = 'social-link-row flex items-center gap-3 bg-gray-50 p-3 rounded-xl';
-            row.innerHTML = '<div class="flex-1 grid grid-cols-3 gap-3">' +
-                '<input type="text" name="social_name" value="" placeholder="名称（如 GitHub）" class="border border-gray-200 rounded-lg px-3 py-2 text-xs outline-none focus:ring-2 focus:ring-indigo-200 focus:border-indigo-400">' +
-                '<input type="text" name="social_url" value="" placeholder="链接地址" class="border border-gray-200 rounded-lg px-3 py-2 text-xs outline-none focus:ring-2 focus:ring-indigo-200 focus:border-indigo-400">' +
-                '<input type="text" name="social_icon" value="" placeholder="图标类名（如 fa-brands fa-github）" class="border border-gray-200 rounded-lg px-3 py-2 text-xs outline-none focus:ring-2 focus:ring-indigo-200 focus:border-indigo-400">' +
+            row.innerHTML = '<div class="flex-1 grid grid-cols-[80px_1fr_1fr_2fr] gap-3">' +
+                '<input type="number" min="1" name="social_sort" value="" placeholder="顺序" class="social-sort border border-gray-200 rounded-lg px-3 py-2 text-xs outline-none focus:ring-2 focus:ring-indigo-200 focus:border-indigo-400">' +
+                '<select name="social_platform" onchange="syncSocialName(this)" class="border border-gray-200 rounded-lg px-3 py-2 text-xs outline-none focus:ring-2 focus:ring-indigo-200 focus:border-indigo-400">' + socialPlatformOptions('custom') + '</select>' +
+                '<input type="text" name="social_name" value="" placeholder="显示名称" class="border border-gray-200 rounded-lg px-3 py-2 text-xs outline-none focus:ring-2 focus:ring-indigo-200 focus:border-indigo-400">' +
+                '<input type="text" name="social_url" value="" placeholder="链接地址（可留空）" class="border border-gray-200 rounded-lg px-3 py-2 text-xs outline-none focus:ring-2 focus:ring-indigo-200 focus:border-indigo-400">' +
                 '</div>' +
-                '<button type="button" onclick="removeSocialLink(this)" class="text-gray-400 hover:text-red-500 transition text-sm p-1"><i class="fa-solid fa-trash-can"></i></button>';
+                '<div class="flex items-center gap-1">' +
+                '<button type="button" onclick="moveSocialLink(this, -1)" class="text-gray-400 hover:text-indigo-500 transition text-sm p-1" title="上移"><i class="fa-solid fa-arrow-up"></i></button>' +
+                '<button type="button" onclick="moveSocialLink(this, 1)" class="text-gray-400 hover:text-indigo-500 transition text-sm p-1" title="下移"><i class="fa-solid fa-arrow-down"></i></button>' +
+                '<button type="button" onclick="removeSocialLink(this)" class="text-gray-400 hover:text-red-500 transition text-sm p-1" title="删除"><i class="fa-solid fa-trash-can"></i></button>' +
+                '</div>';
             container.appendChild(row);
+            renumberSocialLinks();
+        }
+
+        function renumberSocialLinks() {
+            document.querySelectorAll('#social-links .social-sort').forEach(function(input, index) {
+                input.value = (index + 1) * 10;
+            });
+        }
+
+        function moveSocialLink(btn, direction) {
+            var row = btn.closest('.social-link-row');
+            if (!row) return;
+            if (direction < 0 && row.previousElementSibling) {
+                row.parentNode.insertBefore(row, row.previousElementSibling);
+            }
+            if (direction > 0 && row.nextElementSibling) {
+                row.parentNode.insertBefore(row.nextElementSibling, row);
+            }
+            renumberSocialLinks();
         }
 
         function removeSocialLink(btn) {
@@ -100,6 +173,23 @@
             if (container.children.length === 0) {
                 document.getElementById('no-links-hint').classList.remove('hidden');
             }
+            renumberSocialLinks();
         }
+    </script>
+    <script src="/static/vendor/quill/quill.js"></script>
+    <script>
+        var detailQuill = new Quill('#detail-editor', {
+            theme: 'snow',
+            placeholder: '写一段关于你的详细介绍...',
+            modules: { toolbar: [['bold','italic','underline'],['link','blockquote','code-block'],[{list:'ordered'},{list:'bullet'}],[{size:['small','normal','large','huge']}],['clean']] }
+        });
+        // 加载已有内容
+        var existing = {{if .AboutMe.DetailIntro}}'{{.AboutMe.DetailIntro}}'{{else}}''{{end}};
+        if (existing) detailQuill.root.innerHTML = existing.replace(/&lt;/g,'<').replace(/&gt;/g,'>').replace(/&amp;/g,'&').replace(/&#34;/g,'"').replace(/&#39;/g,"'");
+
+        // 提交前同步到隐藏域
+        document.getElementById('aboutForm').addEventListener('submit', function() {
+            document.getElementById('hidden-detail-intro').value = detailQuill.root.innerHTML;
+        });
     </script>
 {{template "admin_tail" .}}

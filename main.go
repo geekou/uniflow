@@ -10,9 +10,9 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
-	"regexp"
 	"strings"
 	"time"
+	"unicode"
 
 	"uniflow/handlers"
 	"uniflow/models"
@@ -22,46 +22,20 @@ import (
 )
 
 // Version 当前版本号
-const Version = "v1.0.1"
+const Version = "v1.3.1"
 
-// stripHTML 移除 HTML 标签，用于字数统计
-func stripHTML(html string) string {
-	var buf []rune
-	inTag := false
-	for _, r := range html {
-		if r == '<' {
-			inTag = true
-			continue
-		}
-		if r == '>' {
-			inTag = false
-			continue
-		}
-		if !inTag {
-			buf = append(buf, r)
-		}
-	}
-	return string(buf)
-}
-
-// splitWords 按空格分割英文单词
+// splitWords 按字母/数字连续段统计英文单词。
 func splitWords(s string) []string {
 	var words []string
 	var cur []rune
 	for _, r := range s {
-		if r <= 127 && (r == ' ' || r == '\n' || r == '\t' || r == ',' || r == '.' || r == '!' || r == '?') {
-			if len(cur) > 0 {
-				words = append(words, string(cur))
-				cur = nil
-			}
-		} else if r > 127 {
-			// 中文字符：结束当前英文单词
-			if len(cur) > 0 {
-				words = append(words, string(cur))
-				cur = nil
-			}
-		} else {
+		if r <= unicode.MaxASCII && (unicode.IsLetter(r) || unicode.IsDigit(r)) {
 			cur = append(cur, r)
+			continue
+		}
+		if len(cur) > 0 {
+			words = append(words, string(cur))
+			cur = nil
 		}
 	}
 	if len(cur) > 0 {
@@ -93,6 +67,9 @@ func main() {
 		log.Fatalf("Failed to initialize database: %v", err)
 	}
 	defer models.CloseDB()
+
+	// 从数据库加载持久化的 HMAC 密钥（必须在 InitDB 之后）
+	handlers.InitHMACSecret()
 
 	// 设置 Gin 模式（生产环境默认 release）
 	mode := os.Getenv("GIN_MODE")
@@ -162,14 +139,11 @@ func main() {
 			}
 			return string(runes[:n]) + "..."
 		},
-		"stripHTML": func(s string) string {
-			re := regexp.MustCompile(`<[^>]*>`)
-			s = re.ReplaceAllString(s, "")
-			s = strings.TrimSpace(s)
-			// collapse whitespace
-			re2 := regexp.MustCompile(`\s+`)
-			return re2.ReplaceAllString(s, " ")
-		},
+		"stripHTML":       utils.StripHTML,
+		"safeURL":         utils.SafeURL,
+		"safeImageURL":    utils.SafeImageURL,
+		"safeMenuURL":     utils.SafeMenuURL,
+		"safeExternalURL": utils.SafeExternalURL,
 		"json": func(v interface{}) (template.JS, error) {
 			b, err := json.Marshal(v)
 			if err != nil {
@@ -208,17 +182,15 @@ func main() {
 			return t.In(time.Local).Format("2006-01-02 15:04")
 		},
 		"wordCount": func(htmlContent string) int {
-			// 去除 HTML 标签，统计中文字数（含标点）
-			text := stripHTML(htmlContent)
+			text := utils.StripHTML(htmlContent)
 			count := 0
 			for _, r := range text {
-				if r > 127 { // 非 ASCII，主要是中文
+				if unicode.Is(unicode.Han, r) {
 					count++
 				}
 			}
-			// 英文单词数
 			for _, w := range splitWords(text) {
-				if w != "" && len(w) > 0 {
+				if w != "" {
 					count++
 				}
 			}
@@ -326,14 +298,21 @@ func main() {
 	r.GET("/post/:id", handlers.PostDetailHandler(db))
 	r.GET("/page/:slug", handlers.CustomPageHandler(db))
 	r.GET("/search", handlers.SearchHandler(db))
+	r.GET("/rss", handlers.RSSHandler(db))
 	r.GET("/guestbook", handlers.GuestbookHandler(db))
+	r.GET("/about", handlers.AboutHandler(db))
+	r.GET("/maptest", handlers.MapTestHandler)
 
 	// ===============================================
 	//   前台 API - 只读（无频率限制）
 	// ===============================================
 	r.GET("/api/stats/heatmap", handlers.StatsHeatmapHandler(db))
-	r.POST("/api/post/like/:id", handlers.PostLikeHandler(db))
-	r.POST("/api/post/dislike/:id", handlers.PostDislikeHandler(db))
+	likeAPI := r.Group("/api")
+	likeAPI.Use(handlers.LikeRateLimitMiddleware())
+	{
+		likeAPI.POST("/post/like/:id", handlers.PostLikeHandler(db))
+		likeAPI.POST("/post/dislike/:id", handlers.PostDislikeHandler(db))
+	}
 	r.GET("/api/auth/check", handlers.AuthCheck(db))
 
 	// ===============================================
@@ -344,11 +323,17 @@ func main() {
 	api.Use(handlers.SensitiveWordFilter(db))
 	{
 		api.POST("/comment", handlers.CommentSubmit(db))
+		api.POST("/comment/like", handlers.CommentLike(db))
+		api.GET("/footprints", handlers.FootprintsAPI(db))
 		api.POST("/guestbook", handlers.GuestbookSubmit(db))
 	}
 
-	// 瞬间点赞（不限流，避免误伤正常用户）
-	r.POST("/api/moment/like/:id", handlers.MomentLikeHandler(db))
+	// 瞬间点赞（轻量限流，防刷量）
+	momentLikeAPI := r.Group("/api")
+	momentLikeAPI.Use(handlers.LikeRateLimitMiddleware())
+	{
+		momentLikeAPI.POST("/moment/like/:id", handlers.MomentLikeHandler(db))
+	}
 
 	// ===============================================
 	//   后台管理路由
@@ -418,6 +403,16 @@ func main() {
 		adminOnly.POST("/settings", handlers.AdminSettingsPost(db))
 		adminOnly.GET("/about", handlers.AdminAbout(db))
 		adminOnly.POST("/about", handlers.AdminAboutPost(db))
+
+		// 设备管理
+		adminOnly.GET("/devices", handlers.AdminDevices(db))
+		adminOnly.POST("/devices/save", handlers.AdminDeviceSave(db))
+		adminOnly.POST("/devices/delete/:id", handlers.AdminDeviceDelete(db))
+
+		// 足迹管理
+		adminOnly.GET("/footprints", handlers.AdminFootprints(db))
+		adminOnly.POST("/footprints/save", handlers.AdminFootprintSave(db))
+		adminOnly.POST("/footprints/delete/:index", handlers.AdminFootprintDelete(db))
 		adminOnly.GET("/sitemap", handlers.AdminSitemap(db))
 
 		// 系统管理（仅 admin）
@@ -429,6 +424,7 @@ func main() {
 
 		adminOnly.GET("/menus", handlers.AdminMenus(db))
 		adminOnly.POST("/menus/save", handlers.AdminMenuSave(db))
+		adminOnly.POST("/menus/update", handlers.AdminMenuUpdate(db))
 		adminOnly.POST("/menus/delete/:id", handlers.AdminMenuDelete(db))
 
 		adminOnly.GET("/pages", handlers.AdminPages(db))
@@ -441,6 +437,7 @@ func main() {
 		adminOnly.GET("/backup", handlers.AdminBackup(db))
 		adminOnly.POST("/backup/create", handlers.AdminBackupCreate(db))
 		adminOnly.POST("/backup/restore/:name", handlers.AdminBackupRestore(db))
+		adminOnly.POST("/backup/upload", handlers.AdminBackupUpload(db))
 		adminOnly.POST("/backup/delete/:name", handlers.AdminBackupDelete(db))
 		adminOnly.GET("/backup/download/:name", handlers.AdminBackupDownload(db))
 

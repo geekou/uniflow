@@ -20,6 +20,38 @@ function createBackup() {
             btn.innerHTML = '<i class="fa-solid fa-download mr-1"></i>立即备份';
         });
 }
+
+function uploadBackup() {
+    var input = document.getElementById('upload-input');
+    var btn = document.getElementById('btn-upload');
+    if (!input.files || !input.files.length) return;
+    var file = input.files[0];
+    if (!file.name.toLowerCase().endsWith('.tar.gz')) {
+        showToast('仅支持 .tar.gz 格式的文件', 'error');
+        input.value = '';
+        return;
+    }
+    btn.disabled = true;
+    btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin mr-1"></i>上传中...';
+    var fd = new FormData();
+    fd.append('backup', file);
+    fetch('/admin/backup/upload', {method: 'POST', body: fd, credentials: 'same-origin', headers: {'X-Requested-With': 'fetch'}})
+        .then(function(r) { return r.json(); })
+        .then(function(data) {
+            if (data.ok) {
+                showToast('上传成功', 'success');
+                setTimeout(function() { location.reload(); }, 800);
+            } else {
+                showToast(data.msg || '上传失败', 'error');
+            }
+        })
+        .catch(function() { showToast('请求失败', 'error'); })
+        .finally(function() {
+            btn.disabled = false;
+            btn.innerHTML = '<i class="fa-solid fa-upload mr-1"></i>选择文件';
+            input.value = '';
+        });
+}
 </script>
     <div class="flex items-center justify-between mb-6">
         <h2 class="text-lg font-bold">备份恢复</h2>
@@ -33,6 +65,20 @@ function createBackup() {
                 <p class="text-xs text-gray-400 mt-1">将数据库和上传文件打包为 .tar.gz 压缩包</p>
             </div>
             <button onclick="createBackup()" id="btn-backup" class="bg-indigo-600 text-white text-xs px-5 py-2.5 rounded-xl font-medium hover:bg-indigo-700 transition shadow-xs shadow-indigo-100"><i class="fa-solid fa-download mr-1"></i>立即备份</button>
+        </div>
+    </div>
+
+    <!-- Upload Backup -->
+    <div class="bg-white rounded-2xl p-6 shadow-xs border border-gray-100/50 mb-6">
+        <div class="flex items-center justify-between gap-4">
+            <div class="flex-1 min-w-0">
+                <h3 class="text-sm font-bold text-gray-700">上传备份</h3>
+                <p class="text-xs text-gray-400 mt-1">从本地上传 .tar.gz 备份文件，上传后可点击"恢复"还原</p>
+            </div>
+            <div class="flex items-center gap-3 shrink-0">
+                <input type="file" id="upload-input" accept=".tar.gz" class="hidden" onchange="uploadBackup()">
+                <button onclick="document.getElementById('upload-input').click()" id="btn-upload" class="bg-white text-gray-600 text-xs px-5 py-2.5 rounded-xl font-medium border border-gray-200 hover:border-indigo-300 hover:text-indigo-600 transition"><i class="fa-solid fa-upload mr-1"></i>选择文件</button>
+            </div>
         </div>
     </div>
 

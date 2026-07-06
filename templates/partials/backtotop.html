@@ -1,0 +1,3 @@
+{{define "partials/backtotop"}}
+<script>(function(){var b=document.createElement('div');b.id='back-to-top';b.innerHTML='<i class="fa-solid fa-chevron-up text-sm"></i>';document.body.appendChild(b);b.addEventListener('click',function(){window.scrollTo({top:0,behavior:'smooth'})});var t=false;window.addEventListener('scroll',function(){if(!t){requestAnimationFrame(function(){b.classList.toggle('show',window.scrollY>window.innerHeight);t=false});t=true}},{passive:true})})();</script>
+{{end}}

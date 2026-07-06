@@ -22,7 +22,8 @@
                         {{if .ReplyTo}}<span class="text-indigo-500 text-[10px] mr-1">↩ @{{.ReplyTo}}</span>{{end}}{{.Content}}
                     </td>
                     <td class="px-5 py-3">
-                        {{if .ImageURL}}<a href="{{.ImageURL}}" target="_blank"><img src="{{.ImageURL}}" class="w-10 h-10 rounded-lg object-cover border"></a>{{else}}<span class="text-gray-300 text-xs">-</span>{{end}}
+                        {{$imageURL := safeURL .ImageURL}}
+                        {{if $imageURL}}<a href="{{$imageURL}}" target="_blank"><img loading="lazy" src="{{$imageURL}}" class="w-10 h-10 rounded-lg object-cover border"></a>{{else}}<span class="text-gray-300 text-xs">-</span>{{end}}
                     </td>
                     <td class="px-5 py-3 text-xs text-gray-400">{{.CreatedAt.Format "01-02 15:04"}}</td>
                     <td class="px-5 py-3">

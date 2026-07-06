@@ -7,13 +7,17 @@ import (
 	"html/template"
 	"log"
 	"net/http"
+	"sort"
 	"strconv"
 	"strings"
+	"sync"
+	"time"
 
 	"uniflow/models"
 	"uniflow/utils"
 
 	"github.com/gin-gonic/gin"
+	"github.com/google/uuid"
 )
 
 // ============ 通用模板辅助函数 ============
@@ -29,9 +33,96 @@ func runeTruncate(s string, n int) string {
 
 // SocialLink 社交链接
 type SocialLink struct {
-	Name string `json:"name"` // 显示名称，如 GitHub、微信、B站
-	URL  string `json:"url"`  // 链接地址
-	Icon string `json:"icon"` // Font Awesome 图标类名，如 fa-brands fa-github
+	Name     string `json:"name"`      // 显示名称，如 GitHub、微信、B站
+	URL      string `json:"url"`       // 链接地址
+	Icon     string `json:"icon"`      // Font Awesome 图标类名，如 fa-brands fa-github
+	Platform string `json:"platform"`  // 平台标识，如 github、wechat、bilibili
+	Badge    string `json:"badge"`     // 无法使用品牌图标时的文字兜底
+	Color    string `json:"color"`     // 前台 hover/text 颜色类
+	Sort     int    `json:"sort"`      // 展示顺序，数字越小越靠前
+}
+
+var socialPlatformPresets = map[string]SocialLink{
+	"github":     {Name: "GitHub", Platform: "github", Icon: "fa-brands fa-github", Badge: "GH", Color: "hover:text-gray-900"},
+	"twitter":    {Name: "Twitter", Platform: "twitter", Icon: "fa-brands fa-twitter", Badge: "X", Color: "hover:text-sky-500"},
+	"email":      {Name: "邮箱", Platform: "email", Icon: "fa-solid fa-envelope", Badge: "@", Color: "hover:text-indigo-600"},
+	"qq":         {Name: "QQ", Platform: "qq", Icon: "fa-brands fa-qq", Badge: "QQ", Color: "hover:text-sky-500"},
+	"wechat":     {Name: "微信", Platform: "wechat", Icon: "fa-brands fa-weixin", Badge: "微", Color: "hover:text-green-500"},
+	"douyin":     {Name: "抖音", Platform: "douyin", Icon: "fa-brands fa-tiktok", Badge: "抖", Color: "hover:text-gray-900"},
+	"bilibili":   {Name: "哔哩哔哩", Platform: "bilibili", Icon: "", Badge: "B站", Color: "hover:text-sky-500"},
+	"xiaohongshu": {Name: "小红书", Platform: "xiaohongshu", Icon: "", Badge: "红", Color: "hover:text-rose-500"},
+}
+
+var socialPlatformNames = map[string]string{
+	"GitHub": "github",
+	"Twitter": "twitter",
+	"邮箱": "email",
+	"Email": "email",
+	"QQ": "qq",
+	"微信": "wechat",
+	"Wechat": "wechat",
+	"WeChat": "wechat",
+	"抖音": "douyin",
+	"Douyin": "douyin",
+	"哔哩哔哩": "bilibili",
+	"B站": "bilibili",
+	"Bilibili": "bilibili",
+	"小红书": "xiaohongshu",
+	"Xiaohongshu": "xiaohongshu",
+}
+
+func normalizeSocialLink(link SocialLink) SocialLink {
+	platform := strings.TrimSpace(link.Platform)
+	if platform == "" {
+		platform = socialPlatformNames[strings.TrimSpace(link.Name)]
+	}
+	if preset, ok := socialPlatformPresets[platform]; ok {
+		preset.URL = strings.TrimSpace(link.URL)
+		preset.Sort = link.Sort
+		if strings.TrimSpace(link.Name) != "" {
+			preset.Name = strings.TrimSpace(link.Name)
+		}
+		return preset
+	}
+	link.Name = strings.TrimSpace(link.Name)
+	link.URL = strings.TrimSpace(link.URL)
+	link.Icon = "fa-solid fa-link"
+	link.Platform = "custom"
+	link.Badge = "链"
+	link.Color = "hover:text-indigo-600"
+	return link
+}
+
+func ensureDefaultSocialLinks(links []SocialLink) []SocialLink {
+	seen := make(map[string]bool)
+	result := make([]SocialLink, 0, len(links)+5)
+	for i, link := range links {
+		normalized := normalizeSocialLink(link)
+		if normalized.Name == "" {
+			continue
+		}
+		if normalized.Sort <= 0 {
+			normalized.Sort = (i + 1) * 10
+		}
+		result = append(result, normalized)
+		if normalized.Platform != "" && normalized.Platform != "custom" {
+			seen[normalized.Platform] = true
+		}
+	}
+	defaultSort := len(result) * 10
+	for _, platform := range []string{"qq", "wechat", "douyin", "bilibili", "xiaohongshu"} {
+		if seen[platform] {
+			continue
+		}
+		defaultSort += 10
+		link := socialPlatformPresets[platform]
+		link.Sort = defaultSort
+		result = append(result, link)
+	}
+	sort.SliceStable(result, func(i, j int) bool {
+		return result[i].Sort < result[j].Sort
+	})
+	return result
 }
 
 // AboutMe 关于我 JSON 结构
@@ -40,8 +131,9 @@ type AboutMe struct {
 	Avatar      string       `json:"avatar"`
 	Bio         string       `json:"bio"`
 	Location    string       `json:"location"`
-	OneWord     string       `json:"one_word"`     // 一言
-	SocialLinks []SocialLink `json:"social_links"` // 社交链接列表
+	OneWord     string       `json:"one_word"`
+	DetailIntro string       `json:"detail_intro"` // 个人简介长文本
+	SocialLinks []SocialLink `json:"social_links"`
 }
 
 // SiteStats 站点统计
@@ -80,6 +172,21 @@ type IndexData struct {
 	Guestbooks        []models.Guestbook
 }
 
+// resolveBannerURL 根据 banner_use_homepage 开关解析各页面的 Banner 图
+// pageKey: banner_url_posts / banner_url_moments / banner_url_guestbook / "" (首页直接用 banner_url)
+func resolveBannerURL(settings map[string]string, pageKey string) string {
+	if settings["banner_use_homepage"] == "true" || settings["banner_use_homepage"] == "" {
+		return settings["banner_url"]
+	}
+	if pageKey == "" {
+		return settings["banner_url"]
+	}
+	if val := settings[pageKey]; val != "" {
+		return val
+	}
+	return settings["banner_url"]
+}
+
 // PageData 自定义页面模板数据
 type PageData struct {
 	SiteTitle        string
@@ -88,11 +195,40 @@ type PageData struct {
 	PageData         models.PageView
 	SiteFoundedAt    string
 	SiteNotification string
+	SearchQuery      string
 }
 
 // ============ 获取公共数据 ============
 
+// siteSettingsCache 站点设置内存缓存（30 秒），避免每个前台请求都全表扫描。
+// 仅缓存读取结果；写入设置（AdminSettingsPost 等）后最多 30 秒生效。
+var (
+	siteSettingsCache     map[string]string
+	siteSettingsCachedAt  time.Time
+	siteSettingsCacheMu   sync.RWMutex
+	siteSettingsCacheTTL  = 30 * time.Second
+)
+
+// InvalidateSiteSettingsCache 使站点设置缓存失效，供后台修改设置后调用。
+func InvalidateSiteSettingsCache() {
+	siteSettingsCacheMu.Lock()
+	siteSettingsCache = nil
+	siteSettingsCacheMu.Unlock()
+}
+
 func getSiteSettings(db *sql.DB) (map[string]string, error) {
+	siteSettingsCacheMu.RLock()
+	if siteSettingsCache != nil && time.Since(siteSettingsCachedAt) < siteSettingsCacheTTL {
+		// 返回副本，避免调用方污染缓存
+		cp := make(map[string]string, len(siteSettingsCache))
+		for k, v := range siteSettingsCache {
+			cp[k] = v
+		}
+		siteSettingsCacheMu.RUnlock()
+		return cp, nil
+	}
+	siteSettingsCacheMu.RUnlock()
+
 	rows, err := db.Query("SELECT key, value FROM system_settings")
 	if err != nil {
 		return nil, err
@@ -107,7 +243,18 @@ func getSiteSettings(db *sql.DB) (map[string]string, error) {
 		}
 		settings[k] = v
 	}
-	return settings, nil
+
+	siteSettingsCacheMu.Lock()
+	siteSettingsCache = settings
+	siteSettingsCachedAt = time.Now()
+	siteSettingsCacheMu.Unlock()
+
+	// 返回副本
+	cp := make(map[string]string, len(settings))
+	for k, v := range settings {
+		cp[k] = v
+	}
+	return cp, nil
 }
 
 func getAboutMe(settings map[string]string) AboutMe {
@@ -180,11 +327,12 @@ func getAboutMe(settings map[string]string) AboutMe {
 	if am.Bio == "" {
 		am.Bio = "热爱技术与生活"
 	}
+	am.SocialLinks = ensureDefaultSocialLinks(am.SocialLinks)
 	return am
 }
 
 func getMenus(db *sql.DB) ([]models.Menu, error) {
-	rows, err := db.Query("SELECT id, name, url, icon, parent_id, order_num FROM menus WHERE parent_id = 0 OR parent_id IS NULL ORDER BY order_num ASC, id ASC")
+	rows, err := db.Query("SELECT id, name, url, icon, parent_id, order_num, is_system, visible FROM menus WHERE visible = 1 ORDER BY order_num ASC, id ASC")
 	if err != nil {
 		return nil, err
 	}
@@ -193,9 +341,13 @@ func getMenus(db *sql.DB) ([]models.Menu, error) {
 	var menus []models.Menu
 	for rows.Next() {
 		var m models.Menu
-		if err := rows.Scan(&m.ID, &m.Name, &m.URL, &m.Icon, &m.ParentID, &m.OrderNum); err != nil {
+		var isSystem int
+		var visible int
+		if err := rows.Scan(&m.ID, &m.Name, &m.URL, &m.Icon, &m.ParentID, &m.OrderNum, &isSystem, &visible); err != nil {
 			continue
 		}
+		m.IsSystem = isSystem != 0
+		m.Visible = visible != 0
 		menus = append(menus, m)
 	}
 	return menus, nil
@@ -207,7 +359,7 @@ func getStats(db *sql.DB) SiteStats {
 	db.QueryRow("SELECT COUNT(*) FROM categories").Scan(&s.CategoryCount)
 	db.QueryRow("SELECT COUNT(*) FROM tags").Scan(&s.TagCount)
 	db.QueryRow("SELECT COUNT(*) FROM comments").Scan(&s.CommentCount)
-	db.QueryRow("SELECT COALESCE(SUM(views),0) FROM posts").Scan(&s.TotalViews)
+	db.QueryRow("SELECT COALESCE(SUM(views),0) FROM posts WHERE status='published' AND privacy='public'").Scan(&s.TotalViews)
 	return s
 }
 
@@ -231,6 +383,9 @@ func getTopPost(db *sql.DB) *models.PostWithMeta {
 // buildInPlaceholders 构建 IN 子句的占位符和参数列表
 // ids: int64 切片 → 返回 ("?,?,?", []interface{}{1,2,3})
 func buildInPlaceholders(ids []int64) (string, []interface{}) {
+	if len(ids) == 0 {
+		return "", nil
+	}
 	placeholders := strings.Repeat("?,", len(ids)-1) + "?"
 	args := make([]interface{}, len(ids))
 	for i, id := range ids {
@@ -246,10 +401,19 @@ func scanLog(err error, context string) {
 	}
 }
 
+func queryLog(context string, rows *sql.Rows, err error) *sql.Rows {
+	if err != nil {
+		log.Printf("[Query] %s: %v", context, err)
+		return nil
+	}
+	return rows
+}
+
 // ============ 公共数据查询 ============
 
 func getHotPosts(db *sql.DB) []models.Post {
-	rows, _ := db.Query("SELECT id, title, content, thumb_url, author, views, category_id, is_top, privacy, status, publish_at, created_at, updated_at FROM posts WHERE status='published' AND privacy='public' ORDER BY views DESC LIMIT 5")
+	rows, err := db.Query("SELECT id, title, content, thumb_url, author, views, category_id, is_top, privacy, status, publish_at, created_at, updated_at FROM posts WHERE status='published' AND privacy='public' ORDER BY views DESC LIMIT 5")
+	rows = queryLog("hotPosts", rows, err)
 	var posts []models.Post
 	if rows != nil {
 		for rows.Next() {
@@ -263,7 +427,8 @@ func getHotPosts(db *sql.DB) []models.Post {
 }
 
 func getTags(db *sql.DB) []models.Tag {
-	rows, _ := db.Query("SELECT t.id, t.name, t.created_at, COUNT(pt.post_id) as post_count FROM tags t LEFT JOIN post_tags pt ON t.id = pt.tag_id GROUP BY t.id ORDER BY post_count DESC LIMIT 20")
+	rows, err := db.Query("SELECT t.id, t.name, t.created_at, COUNT(pt.post_id) as post_count FROM tags t LEFT JOIN post_tags pt ON t.id = pt.tag_id GROUP BY t.id ORDER BY post_count DESC LIMIT 20")
+	rows = queryLog("tags", rows, err)
 	var tags []models.Tag
 	if rows != nil {
 		for rows.Next() {
@@ -277,12 +442,13 @@ func getTags(db *sql.DB) []models.Tag {
 }
 
 func getRecentComments(db *sql.DB) []models.Comment {
-	rows, _ := db.Query("SELECT id, target_type, target_id, author, author_avatar, content, image_url, created_at, parent_id FROM comments ORDER BY created_at DESC LIMIT 5")
+	rows, err := db.Query("SELECT id, target_type, target_id, author, author_avatar, content, image_url, likes, reply_to, created_at, parent_id FROM comments ORDER BY created_at DESC LIMIT 5")
+	rows = queryLog("recentComments", rows, err)
 	var comments []models.Comment
 	if rows != nil {
 		for rows.Next() {
 			var c models.Comment
-			scanLog(rows.Scan(&c.ID, &c.TargetType, &c.TargetID, &c.Author, &c.AuthorAvatar, &c.Content, &c.ImageURL, &c.CreatedAt, &c.ParentID), "recentComments")
+			scanLog(rows.Scan(&c.ID, &c.TargetType, &c.TargetID, &c.Author, &c.AuthorAvatar, &c.Content, &c.ImageURL, &c.Likes, &c.ReplyTo, &c.CreatedAt, &c.ParentID), "recentComments")
 			comments = append(comments, c)
 		}
 		rows.Close()
@@ -331,7 +497,7 @@ func IndexHandler(db *sql.DB) gin.HandlerFunc {
 		// 置顶文章
 		topPost := getTopPost(db)
 
-		// 文章列表（附带分类名和评论数）
+		// 文章列表（附带分类名和评论数），首页随机排序，置顶靠前
 		query := fmt.Sprintf(`
 			SELECT p.id, p.title, p.content, p.thumb_url, p.author, p.views, p.category_id,
 			       p.is_top, p.privacy, p.status, p.publish_at, p.created_at, p.updated_at,
@@ -342,7 +508,7 @@ func IndexHandler(db *sql.DB) gin.HandlerFunc {
 			LEFT JOIN comments cm ON cm.target_type='post' AND cm.target_id=p.id
 			%s
 			GROUP BY p.id
-			ORDER BY p.is_top DESC, p.created_at DESC
+			ORDER BY p.is_top DESC, RANDOM()
 			LIMIT ? OFFSET ?
 		`, where)
 		allArgs := append(args, pageSize, offset)
@@ -380,8 +546,8 @@ func IndexHandler(db *sql.DB) gin.HandlerFunc {
 			catRows.Close()
 		}
 
-		// 瞬间流（最近10条）
-		momentRows, _ := db.Query("SELECT id, content, media_urls, likes, created_at FROM moments ORDER BY created_at DESC LIMIT 10")
+		// 瞬间流（最近10条，随机排序）
+		momentRows, _ := db.Query("SELECT id, content, media_urls, likes, created_at FROM moments ORDER BY RANDOM() LIMIT 10")
 		var moments []models.MomentView
 		mediaMap := make(map[string][]string)
 		if momentRows != nil {
@@ -524,7 +690,7 @@ func PostsListHandler(db *sql.DB) gin.HandlerFunc {
 			SiteSubtitle:     settings["site_subtitle"],
 			SiteFoundedAt:    settings["site_founded_at"],
 			SiteNotification: settings["site_notification"],
-			BannerURL:        settings["banner_url"],
+			BannerURL:        resolveBannerURL(settings, "banner_url_posts"),
 			TopPost:          topPost,
 			AboutMe:          getAboutMe(settings),
 			Menus:            menus,
@@ -578,7 +744,6 @@ func MomentsListHandler(db *sql.DB) gin.HandlerFunc {
 			c.HTML(http.StatusInternalServerError, "moments.html", gin.H{"error": "查询失败"})
 			return
 		}
-		defer momentRows.Close()
 
 		var moments []models.MomentView
 		mediaMap := make(map[string][]string)
@@ -601,11 +766,11 @@ func MomentsListHandler(db *sql.DB) gin.HandlerFunc {
 			}
 			commentMap := make(map[int64][]models.Comment)
 			ph, phArgs := buildInPlaceholders(momentIDs)
-			commentRows, err := db.Query("SELECT id, target_type, target_id, author, author_avatar, content, image_url, created_at, parent_id FROM comments WHERE target_type='moment' AND target_id IN ("+ph+") ORDER BY created_at ASC", phArgs...)
+			commentRows, err := db.Query("SELECT id, target_type, target_id, author, author_avatar, content, image_url, likes, created_at, parent_id FROM comments WHERE target_type='moment' AND target_id IN ("+ph+") ORDER BY created_at DESC", phArgs...)
 			if err == nil {
 				for commentRows.Next() {
 					var cm models.Comment
-					scanLog(commentRows.Scan(&cm.ID, &cm.TargetType, &cm.TargetID, &cm.Author, &cm.AuthorAvatar, &cm.Content, &cm.ImageURL, &cm.CreatedAt, &cm.ParentID), "momentComments")
+					scanLog(commentRows.Scan(&cm.ID, &cm.TargetType, &cm.TargetID, &cm.Author, &cm.AuthorAvatar, &cm.Content, &cm.ImageURL, &cm.Likes, &cm.CreatedAt, &cm.ParentID), "momentComments")
 					commentMap[cm.TargetID] = append(commentMap[cm.TargetID], cm)
 				}
 				commentRows.Close()
@@ -660,7 +825,7 @@ func MomentsListHandler(db *sql.DB) gin.HandlerFunc {
 			SiteSubtitle:     settings["site_subtitle"],
 			SiteFoundedAt:    settings["site_founded_at"],
 			SiteNotification: settings["site_notification"],
-			BannerURL:        settings["banner_url"],
+			BannerURL:        resolveBannerURL(settings, "banner_url_moments"),
 			AboutMe:          getAboutMe(settings),
 			Menus:            menus,
 			Stats:            getStats(db),
@@ -697,6 +862,7 @@ type PostDetailData struct {
 	NextPost         *models.PostWithMeta
 	SiteFoundedAt    string
 	SiteNotification string
+	SearchQuery      string
 	WechatQR         string
 	AlipayQR         string
 	ActiveMenu       string
@@ -758,9 +924,19 @@ func PostDetailHandler(db *sql.DB) gin.HandlerFunc {
 			return
 		}
 
-		// 浏览量 +1
-		db.Exec("UPDATE posts SET views = views + 1 WHERE id = ?", id)
-		post.Views++
+		// 浏览量 +1（同一访客同篇文章每天只计一次）
+		vid, _ := c.Cookie("visitor_id")
+		if vid == "" {
+			vid = uuid.New().String()[:8]
+			c.SetCookie("visitor_id", vid, 365*24*3600, "/", "", false, true)
+		}
+		today := time.Now().Format("2006-01-02")
+		res, _ := db.Exec("INSERT OR IGNORE INTO post_visits (post_id, visitor_id, visit_date) VALUES (?, ?, ?)", id, vid, today)
+		if n, _ := res.RowsAffected(); n > 0 {
+			db.Exec("UPDATE posts SET views = views + 1 WHERE id = ?", id)
+		}
+		// 重新读取最新浏览量用于展示
+		db.QueryRow("SELECT views FROM posts WHERE id = ?", id).Scan(&post.Views)
 
 		// 查询文章标签
 		var tags []models.Tag
@@ -823,12 +999,13 @@ func PostDetailHandler(db *sql.DB) gin.HandlerFunc {
 		}
 
 		// 最新评论
-		commentRows, _ := db.Query("SELECT id, target_type, target_id, author, author_avatar, content, image_url, created_at, parent_id FROM comments ORDER BY created_at DESC LIMIT 5")
+		commentRows, err := db.Query("SELECT id, target_type, target_id, author, author_avatar, content, image_url, likes, reply_to, created_at, parent_id FROM comments ORDER BY created_at DESC LIMIT 5")
+		commentRows = queryLog("postDetailRecentComments", commentRows, err)
 		var recentComments []models.Comment
 		if commentRows != nil {
 			for commentRows.Next() {
 				var cm models.Comment
-				scanLog(commentRows.Scan(&cm.ID, &cm.TargetType, &cm.TargetID, &cm.Author, &cm.AuthorAvatar, &cm.Content, &cm.ImageURL, &cm.CreatedAt, &cm.ParentID), "recentComments")
+				scanLog(commentRows.Scan(&cm.ID, &cm.TargetType, &cm.TargetID, &cm.Author, &cm.AuthorAvatar, &cm.Content, &cm.ImageURL, &cm.Likes, &cm.ReplyTo, &cm.CreatedAt, &cm.ParentID), "recentComments")
 				recentComments = append(recentComments, cm)
 			}
 			commentRows.Close()
@@ -836,11 +1013,12 @@ func PostDetailHandler(db *sql.DB) gin.HandlerFunc {
 
 		// 文章评论
 		var postComments []models.Comment
-		pcRows, _ := db.Query("SELECT id, target_type, target_id, author, author_avatar, content, image_url, created_at, parent_id FROM comments WHERE target_type='post' AND target_id = ? ORDER BY created_at ASC", id)
+		pcRows, err := db.Query("SELECT id, target_type, target_id, author, author_avatar, content, image_url, likes, created_at, parent_id FROM comments WHERE target_type='post' AND target_id = ? ORDER BY created_at DESC", id)
+		pcRows = queryLog("postComments", pcRows, err)
 		if pcRows != nil {
 			for pcRows.Next() {
 				var cm models.Comment
-				scanLog(pcRows.Scan(&cm.ID, &cm.TargetType, &cm.TargetID, &cm.Author, &cm.AuthorAvatar, &cm.Content, &cm.ImageURL, &cm.CreatedAt, &cm.ParentID), "postComments")
+				scanLog(pcRows.Scan(&cm.ID, &cm.TargetType, &cm.TargetID, &cm.Author, &cm.AuthorAvatar, &cm.Content, &cm.ImageURL, &cm.Likes, &cm.CreatedAt, &cm.ParentID), "postComments")
 				postComments = append(postComments, cm)
 			}
 			pcRows.Close()
@@ -977,24 +1155,54 @@ func MomentLikeHandler(db *sql.DB) gin.HandlerFunc {
 			return
 		}
 
-		// 点赞数 +1
-		result, err := db.Exec("UPDATE moments SET likes = likes + 1 WHERE id = ?", id)
-		if err != nil {
-			c.JSON(http.StatusInternalServerError, gin.H{"ok": false, "msg": "操作失败"})
+		// 获取或生成访客标识
+		vid, _ := c.Cookie("visitor_id")
+		if vid == "" {
+			vid = uuid.New().String()[:8]
+			c.SetCookie("visitor_id", vid, 365*24*3600, "/", "", false, true)
+		}
+
+		// 用事务保证点赞/取消与计数的一致性，避免竞态
+		tx, txErr := db.Begin()
+		if txErr != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"ok": false, "msg": "操作失败，请稍后重试"})
+			return
+		}
+		defer tx.Rollback() //nolint:errcheck
+
+		// 尝试插入点赞记录（利用 UNIQUE 约束防重复）
+		res, insErr := tx.Exec("INSERT OR IGNORE INTO moment_likes (moment_id, visitor_id) VALUES (?, ?)", id, vid)
+		if insErr != nil {
+			log.Printf("[MomentLike] insert error: %v", insErr)
+			c.JSON(http.StatusInternalServerError, gin.H{"ok": false, "msg": "操作失败，请稍后重试"})
+			return
+		}
+		n, _ := res.RowsAffected()
+		var (
+			liked     bool
+			finalLike int64
+		)
+		if n > 0 {
+			// 新点赞
+			tx.QueryRow("UPDATE moments SET likes = likes + 1 WHERE id=? RETURNING likes", id).Scan(&finalLike)
+			liked = true
+		} else {
+			// 已存在，取消点赞；仅当确实删除了一条记录时才 -1
+			delRes, _ := tx.Exec("DELETE FROM moment_likes WHERE moment_id=? AND visitor_id=?", id, vid)
+			if dn, _ := delRes.RowsAffected(); dn > 0 {
+				tx.QueryRow("UPDATE moments SET likes = MAX(0, likes - 1) WHERE id=? RETURNING likes", id).Scan(&finalLike)
+			} else {
+				tx.QueryRow("SELECT likes FROM moments WHERE id=?", id).Scan(&finalLike)
+			}
+			liked = false
+		}
+		if err := tx.Commit(); err != nil {
+			log.Printf("[MomentLike] commit error: %v", err)
+			c.JSON(http.StatusInternalServerError, gin.H{"ok": false, "msg": "操作失败，请稍后重试"})
 			return
 		}
 
-		rowsAffected, _ := result.RowsAffected()
-		if rowsAffected == 0 {
-			c.JSON(http.StatusNotFound, gin.H{"ok": false, "msg": "瞬间不存在"})
-			return
-		}
-
-		// 返回最新点赞数
-		var likes int
-		db.QueryRow("SELECT likes FROM moments WHERE id = ?", id).Scan(&likes)
-
-		c.JSON(http.StatusOK, gin.H{"ok": true, "likes": likes})
+		c.JSON(http.StatusOK, gin.H{"ok": true, "likes": finalLike, "liked": liked})
 	}
 }
 
@@ -1007,6 +1215,7 @@ func SearchHandler(db *sql.DB) gin.HandlerFunc {
 		query := strings.TrimSpace(c.Query("q"))
 
 		var posts []models.PostWithMeta
+		var moments []models.MomentView
 		if query != "" {
 			likeQuery := "%" + query + "%"
 			rows, err := db.Query(`
@@ -1035,11 +1244,24 @@ func SearchHandler(db *sql.DB) gin.HandlerFunc {
 				}
 				rows.Close()
 			}
+
+			// 搜索瞬间
+			mRows, mErr := db.Query("SELECT id, content, media_urls, likes, created_at FROM moments WHERE content LIKE ? ORDER BY created_at DESC LIMIT 20", likeQuery)
+			if mErr == nil && mRows != nil {
+				for mRows.Next() {
+					var m models.MomentView
+					scanLog(mRows.Scan(&m.ID, &m.Content, &m.MediaURLs, &m.Likes, &m.CreatedAt), "searchMoments")
+					m.IDStr = strconv.FormatInt(m.ID, 10)
+					moments = append(moments, m)
+				}
+				mRows.Close()
+			}
 		}
 
 		hotPosts := getHotPosts(db)
 		tags := getTags(db)
 		recentComments := getRecentComments(db)
+		topPost := getTopPost(db)
 
 		data := IndexData{
 			SiteTitle:        settings["site_title"],
@@ -1050,6 +1272,7 @@ func SearchHandler(db *sql.DB) gin.HandlerFunc {
 			Menus:            menus,
 			Stats:            getStats(db),
 			Posts:            posts,
+			Moments:          moments,
 			MomentMediaMap:   map[string][]string{},
 			Tags:             tags,
 			HotPosts:         hotPosts,
@@ -1059,8 +1282,102 @@ func SearchHandler(db *sql.DB) gin.HandlerFunc {
 			TotalPages:       1,
 			PageRange:        []int{1},
 		}
-		c.HTML(http.StatusOK, "posts.html", data)
+		c.HTML(http.StatusOK, "posts.html", gin.H{
+			"SiteTitle":        data.SiteTitle,
+			"SiteSubtitle":     data.SiteSubtitle,
+			"SiteFoundedAt":    data.SiteFoundedAt,
+			"SiteNotification": data.SiteNotification,
+			"AboutMe":          data.AboutMe,
+			"Menus":            data.Menus,
+			"Stats":            data.Stats,
+			"BannerURL":        settings["banner_url"],
+			"TopPost":          topPost,
+			"Posts":            data.Posts,
+			"Tags":             data.Tags,
+			"HotPosts":         data.HotPosts,
+			"RecentComments":   data.RecentComments,
+			"SearchQuery":      data.SearchQuery,
+			"Page":             data.Page,
+			"TotalPages":       data.TotalPages,
+			"PageRange":        data.PageRange,
+			"Moments":          data.Moments,
+			"MomentMediaMap":   data.MomentMediaMap,
+		})
 	}
+}
+
+// ============ 关于我处理器 ============
+
+func AboutHandler(db *sql.DB) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		settings, _ := getSiteSettings(db)
+		menus, _ := getMenus(db)
+		hotPosts := getHotPosts(db)
+		tags := getTags(db)
+		recentComments := getRecentComments(db)
+		aboutMe := getAboutMe(settings)
+
+		// 设备列表
+		dRows, _ := db.Query("SELECT id, name, image_url, info, order_num FROM devices ORDER BY order_num ASC, id ASC")
+		var devices []models.Device
+		if dRows != nil {
+			for dRows.Next() {
+				var d models.Device
+				dRows.Scan(&d.ID, &d.Name, &d.ImageURL, &d.Info, &d.OrderNum)
+				devices = append(devices, d)
+			}
+			dRows.Close()
+		}
+
+		data := IndexData{
+			SiteTitle:        settings["site_title"],
+			SiteSubtitle:     settings["site_subtitle"],
+			SiteFoundedAt:    settings["site_founded_at"],
+			SiteNotification: settings["site_notification"],
+			AboutMe:          aboutMe,
+			Menus:            menus,
+			Tags:             tags,
+			HotPosts:         hotPosts,
+			RecentComments:   recentComments,
+		}
+		// 额外数据用 gin.H 包装到模板
+		c.HTML(http.StatusOK, "about.html", gin.H{
+			"SiteTitle":        data.SiteTitle,
+			"SiteSubtitle":     data.SiteSubtitle,
+			"SiteFoundedAt":    data.SiteFoundedAt,
+			"SiteNotification": data.SiteNotification,
+			"AboutMe":          data.AboutMe,
+			"Menus":            data.Menus,
+			"Stats":            getStats(db),
+			"TopPost":          getTopPost(db),
+			"BannerURL":        settings["banner_url"],
+			"Tags":             data.Tags,
+			"HotPosts":         data.HotPosts,
+			"RecentComments":   data.RecentComments,
+			"Devices":          devices,
+			"DetailIntro":      template.HTML(utils.SanitizeHTML(aboutMe.DetailIntro)),
+			"AmapKey":          settings["amap_key"],
+			"AmapJsCode":       settings["amap_jscode"],
+		})
+	}
+}
+
+// ============ 足迹 API ============
+
+func FootprintsAPI(db *sql.DB) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		var raw string
+		db.QueryRow("SELECT value FROM system_settings WHERE key='footprints_json'").Scan(&raw)
+		if raw == "" {
+			raw = "[]"
+		}
+		c.Data(http.StatusOK, "application/json; charset=utf-8", []byte(raw))
+	}
+}
+
+// MapTest 地图测试页
+func MapTestHandler(c *gin.Context) {
+	c.HTML(http.StatusOK, "maptest.html", nil)
 }
 
 // ============ 留言板处理器 ============
@@ -1129,7 +1446,7 @@ func GuestbookHandler(db *sql.DB) gin.HandlerFunc {
 			SiteSubtitle:      settings["site_subtitle"],
 			SiteFoundedAt:     settings["site_founded_at"],
 			SiteNotification:  settings["site_notification"],
-			BannerURL:         settings["banner_url"],
+			BannerURL:         resolveBannerURL(settings, "banner_url_guestbook"),
 			AboutMe:           getAboutMe(settings),
 			Menus:             menus,
 			Stats:             getStats(db),

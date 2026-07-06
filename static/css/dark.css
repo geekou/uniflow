@@ -1,0 +1,36 @@
+@media (prefers-color-scheme: dark) {
+    body { background: #111827; color: #d1d5db; }
+    .bg-white, .bg-white\/15, .bg-white\/65, .bg-white\/78 { background: #1f2937 !important; }
+    .bg-gray-50, .bg-gray-50\/80 { background: #374151 !important; }
+    .bg-gray-50\/50 { background: #374151 !important; }
+    .bg-\[\#F4F6F9\] { background: #111827 !important; }
+    .text-gray-800 { color: #d1d5db !important; }
+    .text-gray-700 { color: #9ca3af !important; }
+    .text-gray-600 { color: #9ca3af !important; }
+    .text-gray-500 { color: #6b7280 !important; }
+    .text-gray-400 { color: #6b7280 !important; }
+    .text-gray-300 { color: #4b5563 !important; }
+    .border-gray-100, .border-gray-100\/50, .border-gray-100\/70 { border-color: #374151 !important; }
+    .border-gray-50 { border-color: #374151 !important; }
+    .border-gray-200 { border-color: #4b5563 !important; }
+    .shadow-xs { box-shadow: 0 1px 2px rgba(0,0,0,0.3) !important; }
+    .shadow-sm { box-shadow: 0 1px 3px rgba(0,0,0,0.4) !important; }
+    .shadow-md { box-shadow: 0 4px 6px rgba(0,0,0,0.4) !important; }
+    .hover\:bg-gray-50:hover { background: #374151 !important; }
+    .hover\:text-indigo-600:hover, .hover\:text-indigo-500:hover { color: #818cf8 !important; }
+    .hover\:bg-indigo-50:hover { background: #312e81 !important; }
+    .hover\:bg-indigo-50\/50:hover { background: #312e8155 !important; }
+    .hover\:border-indigo-300:hover { border-color: #6366f1 !important; }
+    nav a.text-gray-600 { color: #9ca3af !important; }
+    .text-indigo-600 { color: #818cf8 !important; }
+    .text-indigo-500 { color: #818cf8 !important; }
+    .bg-indigo-600 { background: #4f46e5 !important; }
+    .bg-indigo-50 { background: #312e81 !important; }
+    a { color: #818cf8; }
+    .glass { background: rgba(31,41,55,0.8) !important; backdrop-filter: blur(20px); border-color: rgba(75,85,99,0.6) !important; }
+    .glass-strong { background: rgba(31,41,55,0.9) !important; backdrop-filter: blur(28px); border-color: rgba(75,85,99,0.7) !important; }
+    input, textarea { background: #1f2937 !important; color: #d1d5db !important; border-color: #374151 !important; }
+    input::placeholder, textarea::placeholder { color: #6b7280 !important; }
+    .bg-gradient-to-br.from-indigo-500 { --tw-gradient-from: #4338ca !important; }
+    .shadow-indigo-200 { --tw-shadow-color: rgba(79,70,229,0.15) !important; }
+}

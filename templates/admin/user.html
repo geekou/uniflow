@@ -37,7 +37,7 @@
                 <tr class="hover:bg-gray-50/50 transition">
                     <td class="px-5 py-3 text-xs text-gray-400">{{.ID}}</td>
                     <td class="px-5 py-3">
-                        {{if .AvatarURL}}<img src="{{.AvatarURL}}" class="w-8 h-8 rounded-full object-cover">
+                        {{if .AvatarURL}}<img loading="lazy" src="{{safeImageURL .AvatarURL}}" class="w-8 h-8 rounded-full object-cover">
                         {{else}}<div class="w-8 h-8 rounded-full bg-gradient-to-br from-indigo-400 to-purple-500 flex items-center justify-center text-white text-xs font-bold">{{index .Username 0}}</div>{{end}}
                     </td>
                     <td class="px-5 py-3 font-medium text-gray-700">{{.Username}}</td>
@@ -47,7 +47,7 @@
                     </td>
                     <td class="px-5 py-3 text-xs text-gray-400">{{formatDate .CreatedAt}}</td>
                     <td class="px-5 py-3">
-                        <button onclick="showEditUser({{.ID}}, '{{.Username}}', '{{.Role}}', '{{.AvatarURL}}')" class="text-xs text-indigo-400 hover:text-indigo-600 mr-2" title="编辑"><i class="fa-solid fa-pen-to-square"></i></button>
+                        <button onclick="showEditUser({{.ID}}, '{{.Username}}', '{{.Role}}', '{{safeImageURL .AvatarURL}}')" class="text-xs text-indigo-400 hover:text-indigo-600 mr-2" title="编辑"><i class="fa-solid fa-pen-to-square"></i></button>
                         <button onclick="showResetPw({{.ID}}, '{{.Username}}')" class="text-xs text-amber-400 hover:text-amber-600 mr-2" title="修改密码"><i class="fa-solid fa-key"></i></button>
                         <button onclick="confirmAction('确定删除此用户？', '/admin/users/delete/{{.ID}}')" class="text-xs text-red-400 hover:text-red-600" title="删除"><i class="fa-solid fa-trash"></i></button>
                     </td>
@@ -77,7 +77,7 @@
         <div class="mb-4">
             <label class="text-xs font-medium text-gray-500 mb-1 block">头像</label>
             <div class="flex items-center gap-3 mb-2">
-                <img id="edit-avatar-preview" src="" class="w-10 h-10 rounded-full object-cover border shrink-0 bg-gray-100">
+                <img loading="lazy" id="edit-avatar-preview" src="" class="w-10 h-10 rounded-full object-cover border shrink-0 bg-gray-100">
                 <input type="file" id="edit-avatar-file" accept="image/*" class="w-full text-xs text-gray-500 file:mr-2 file:py-1 file:px-2 file:rounded-lg file:border-0 file:text-xs file:font-medium file:bg-indigo-50 file:text-indigo-600 file:cursor-pointer">
             </div>
             <p class="text-xs text-gray-400">支持 JPG/PNG，留空使用默认头像</p>

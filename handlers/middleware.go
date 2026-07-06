@@ -9,6 +9,7 @@ import (
 	"fmt"
 	"log"
 	"net/http"
+	"os"
 	"strings"
 	"sync"
 	"time"
@@ -16,6 +17,7 @@ import (
 	"github.com/gin-gonic/gin"
 
 	"uniflow/models"
+	"uniflow/utils"
 )
 
 // ============ 安全响应头中间件 ============
@@ -28,7 +30,8 @@ func SecurityHeadersMiddleware() gin.HandlerFunc {
 		c.Header("X-XSS-Protection", "1; mode=block")
 		c.Header("Referrer-Policy", "strict-origin-when-cross-origin")
 		c.Header("Permissions-Policy", "camera=(), microphone=(), geolocation=()")
-		c.Header("Content-Security-Policy", "default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval' https://cdn.jsdelivr.net https://cdnjs.cloudflare.com https://cdn.quilljs.com; style-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net https://cdnjs.cloudflare.com; img-src 'self' data: https:; media-src 'self'; font-src 'self' https://cdnjs.cloudflare.com; connect-src 'self'")
+		c.Header("Cache-Control", "no-cache, must-revalidate")
+		c.Header("Content-Security-Policy", "default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval' https://*.amap.com https://*.autonavi.com; style-src 'self' 'unsafe-inline'; img-src * data: blob:; font-src 'self' data:; connect-src *; worker-src blob:; frame-ancestors 'none'; base-uri 'self'; form-action 'self'")
 		c.Next()
 	}
 }
@@ -36,30 +39,48 @@ func SecurityHeadersMiddleware() gin.HandlerFunc {
 // ============ 管理员会话管理 ============
 
 type sessionEntry struct {
-	username  string
-	createdAt time.Time
+	username     string
+	createdAt    time.Time
+	lastActiveAt time.Time
+	lastDBSync   time.Time // 上次同步到数据库的时间，限频用
 }
 
 var (
-	sessionStore = make(map[string]sessionEntry) // token -> session
+	sessionStore = make(map[string]sessionEntry) // token -> session (内存缓存)
 	sessionMu    sync.RWMutex
 	hmacSecret   []byte
+	hmacInitDone bool
 )
 
-func init() {
+// InitHMACSecret 从数据库加载 HMAC 密钥，如果数据库不可用则回退到随机生成。
+// 必须在 models.InitDB 之后调用。密钥持久化在 system_settings 表中，
+// 服务重启后保持一致，已签发的 Cookie 不会因重启而失效。
+func InitHMACSecret() {
+	if hmacInitDone {
+		return
+	}
+	keyStr := models.GetSetting("hmac_secret")
+	if keyStr != "" {
+		if decoded, err := hex.DecodeString(keyStr); err == nil && len(decoded) == 32 {
+			hmacSecret = decoded
+			hmacInitDone = true
+			log.Println("[Auth] HMAC secret loaded from database")
+			return
+		}
+	}
+	// 回退：数据库不可用时生成临时密钥（重启后 Cookie 失效，但不阻塞启动）
 	key := make([]byte, 32)
 	if _, err := rand.Read(key); err != nil {
 		log.Fatalf("[FATAL] crypto/rand failed to generate HMAC key: %v", err)
 	}
 	hmacSecret = key
+	hmacInitDone = true
+	log.Println("[WARN] HMAC secret generated in-memory (DB unavailable, cookies will not survive restart)")
 }
 
 // setSessionCookie 设置带 SameSite=Strict 的会话 cookie
 func setSessionCookie(c *gin.Context, value string, maxAge int) {
-	secure := true
-	if c.Request.TLS == nil && (c.Request.Host == "localhost:9090" || strings.HasPrefix(c.Request.Host, "127.0.0.1") || strings.HasPrefix(c.Request.Host, "localhost")) {
-		secure = false // 本地开发允许 HTTP
-	}
+	secure := shouldUseSecureCookie(c)
 	http.SetCookie(c.Writer, &http.Cookie{
 		Name:     "uniflow_session",
 		Value:    value,
@@ -71,7 +92,27 @@ func setSessionCookie(c *gin.Context, value string, maxAge int) {
 	})
 }
 
-// GenerateSession 创建管理员会话，返回 token
+// shouldUseSecureCookie 判断是否应标记 Secure。
+// 支持 FORCE_SECURE_COOKIE 环境变量（反向代理场景强制开启）。
+func shouldUseSecureCookie(c *gin.Context) bool {
+	// 环境变量强制开启（用于 Nginx/Caddy 反向代理 TLS 终止场景）
+	if os.Getenv("FORCE_SECURE_COOKIE") == "true" {
+		return true
+	}
+	// 本地开发 HTTP 环境允许非 Secure
+	if c.Request.TLS == nil {
+		host := c.Request.Host
+		if strings.HasPrefix(host, "localhost") || strings.HasPrefix(host, "127.0.0.1") {
+			return false
+		}
+		// 非 localhost 的 HTTP 请求：如果部署在反向代理后面，
+		// 仍然可能是 TLS，保守起见设为 true
+		return true
+	}
+	return true
+}
+
+// GenerateSession 创建管理员会话，返回 token（同时持久化到数据库）
 func GenerateSession(username string) string {
 	token := make([]byte, 32)
 	if _, err := rand.Read(token); err != nil {
@@ -79,27 +120,70 @@ func GenerateSession(username string) string {
 		return ""
 	}
 	tokenStr := hex.EncodeToString(token)
+	now := time.Now()
 
 	sessionMu.Lock()
-	sessionStore[tokenStr] = sessionEntry{username: username, createdAt: time.Now()}
+	sessionStore[tokenStr] = sessionEntry{username: username, createdAt: now, lastActiveAt: now, lastDBSync: now}
 	sessionMu.Unlock()
+
+	// 持久化到数据库，重启后仍可恢复
+	if models.DB != nil {
+		models.DB.Exec("INSERT OR REPLACE INTO sessions (token, username, created_at, last_active_at) VALUES (?, ?, ?, ?)",
+			tokenStr, username, now.Format("2006-01-02 15:04:05"), now.Format("2006-01-02 15:04:05"))
+	}
 
 	return tokenStr
 }
 
-// ValidateSession 验证会话 token，返回用户名
+// ValidateSession 验证会话 token，返回用户名（带滑动窗口续期）
 func ValidateSession(token string) (string, bool) {
-	sessionMu.RLock()
-	defer sessionMu.RUnlock()
+	sessionMu.Lock()
+	defer sessionMu.Unlock()
 	e, ok := sessionStore[token]
-	if !ok {
-		return "", false
+	if ok {
+		// 内存命中
+		if time.Since(e.lastActiveAt) > 7*24*time.Hour {
+			delete(sessionStore, token)
+			if models.DB != nil {
+				models.DB.Exec("DELETE FROM sessions WHERE token = ?", token)
+			}
+			return "", false
+		}
+		now := time.Now()
+		e.lastActiveAt = now
+		sessionStore[token] = e
+		// 限频异步更新数据库（每 5 分钟一次），避免 MaxOpenConns=1 下写压力
+		if models.DB != nil && now.Sub(e.lastDBSync) > 5*time.Minute {
+			e.lastDBSync = now
+			sessionStore[token] = e
+			go models.DB.Exec("UPDATE sessions SET last_active_at = ? WHERE token = ?",
+				now.Format("2006-01-02 15:04:05"), token)
+		}
+		return e.username, true
 	}
-	// 会话超过 7 天自动过期
-	if time.Since(e.createdAt) > 7*24*time.Hour {
-		return "", false
+
+	// 内存未命中，尝试从数据库恢复（服务重启后）
+	if models.DB != nil {
+		var username string
+		var lastActiveStr string
+		err := models.DB.QueryRow("SELECT username, last_active_at FROM sessions WHERE token = ?", token).Scan(&username, &lastActiveStr)
+		if err == nil {
+			lastActive, parseErr := time.Parse("2006-01-02 15:04:05", lastActiveStr)
+			if parseErr != nil {
+				lastActive = time.Now()
+			}
+			if time.Since(lastActive) > 7*24*time.Hour {
+				models.DB.Exec("DELETE FROM sessions WHERE token = ?", token)
+				return "", false
+			}
+			// 恢复到内存缓存
+			now := time.Now()
+			sessionStore[token] = sessionEntry{username: username, createdAt: lastActive, lastActiveAt: now, lastDBSync: now}
+			return username, true
+		}
 	}
-	return e.username, true
+
+	return "", false
 }
 
 // RevokeSession 撤销会话
@@ -107,6 +191,9 @@ func RevokeSession(token string) {
 	sessionMu.Lock()
 	delete(sessionStore, token)
 	sessionMu.Unlock()
+	if models.DB != nil {
+		models.DB.Exec("DELETE FROM sessions WHERE token = ?", token)
+	}
 }
 
 // SignCookie 签名 cookie 值
@@ -190,6 +277,8 @@ type rateLimitEntry struct {
 var (
 	rateLimitStore = make(map[string]*rateLimitEntry)
 	rateLimitMu    sync.Mutex
+	likeLimitStore = make(map[string]*rateLimitEntry)
+	likeLimitMu    sync.Mutex
 )
 
 // 缓存限流配置，避免每个请求都查数据库
@@ -220,6 +309,28 @@ func init() {
 				}
 			}
 			rateLimitMu.Unlock()
+
+			likeLimitMu.Lock()
+			for ip, entry := range likeLimitStore {
+				if now.After(entry.expireAt) {
+					delete(likeLimitStore, ip)
+				}
+			}
+			likeLimitMu.Unlock()
+
+			// 清理过期 session（超过 7 天未活跃），避免内存泄漏
+			sessionMu.Lock()
+			for token, e := range sessionStore {
+				if now.Sub(e.lastActiveAt) > 7*24*time.Hour {
+					delete(sessionStore, token)
+				}
+			}
+			sessionMu.Unlock()
+			// 同步清理数据库中的过期 session
+			if models.DB != nil {
+				cutoff := now.Add(-7 * 24 * time.Hour).Format("2006-01-02 15:04:05")
+				models.DB.Exec("DELETE FROM sessions WHERE last_active_at < ?", cutoff)
+			}
 		}
 	}()
 }
@@ -287,6 +398,34 @@ func RateLimitMiddleware(db *sql.DB) gin.HandlerFunc {
 	}
 }
 
+// LikeRateLimitMiddleware 点赞/拍砖轻量限流，防止公开接口被脚本刷量。
+func LikeRateLimitMiddleware() gin.HandlerFunc {
+	const maxLikes = 30
+	const window = time.Minute
+
+	return func(c *gin.Context) {
+		ip := getClientIP(c)
+		now := time.Now()
+		likeLimitMu.Lock()
+		entry, exists := likeLimitStore[ip]
+		if !exists || now.After(entry.expireAt) {
+			likeLimitStore[ip] = &rateLimitEntry{count: 1, expireAt: now.Add(window)}
+			likeLimitMu.Unlock()
+			c.Next()
+			return
+		}
+		if entry.count >= maxLikes {
+			likeLimitMu.Unlock()
+			c.JSON(http.StatusTooManyRequests, gin.H{"ok": false, "msg": "点赞过于频繁，请稍后再试"})
+			c.Abort()
+			return
+		}
+		entry.count++
+		likeLimitMu.Unlock()
+		c.Next()
+	}
+}
+
 // ============ 敏感词过滤 ============
 
 // getSensitiveWords 获取敏感词列表（内存缓存 5 分钟）
@@ -341,8 +480,10 @@ func SensitiveWordFilter(db *sql.DB) gin.HandlerFunc {
 
 		content := c.PostForm("content")
 		author := c.PostForm("author")
+		// 同时对净化后的内容做检测，防止用 HTML 标签拆分敏感词绕过（如 <b>敏</b>感词）
+		sanitized := utils.SanitizeHTML(content)
 		for _, w := range wordList {
-			if strings.Contains(content, w) || strings.Contains(author, w) {
+			if strings.Contains(content, w) || strings.Contains(author, w) || strings.Contains(sanitized, w) {
 				c.JSON(http.StatusForbidden, gin.H{
 					"ok":  false,
 					"msg": "内容包含敏感词汇，请修改后重新提交",

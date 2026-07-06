@@ -35,23 +35,59 @@
         <!-- Menu List -->
         <table class="w-full text-sm">
             <thead class="bg-gray-50/50 text-xs text-gray-400">
-                <tr><th class="text-left px-4 py-3">ID</th><th class="text-left px-4 py-3">名称</th><th class="text-left px-4 py-3">URL</th><th class="text-left px-4 py-3">图标</th><th class="text-left px-4 py-3">排序</th><th class="text-left px-4 py-3">操作</th></tr>
+                <tr><th class="text-left px-3 py-3">ID</th><th class="text-left px-3 py-3">名称</th><th class="text-left px-3 py-3">URL</th><th class="text-left px-3 py-3">图标</th><th class="text-left px-3 py-3">排序</th><th class="text-center px-3 py-3">显示</th><th class="text-left px-3 py-3">操作</th></tr>
             </thead>
             <tbody class="divide-y divide-gray-50">
                 {{range .Menus}}
-                <tr class="hover:bg-gray-50/50 transition">
-                    <td class="px-4 py-3 text-xs text-gray-400">{{.ID}}</td>
-                    <td class="px-4 py-3 font-medium text-gray-700">{{.Name}}</td>
-                    <td class="px-4 py-3 text-xs text-gray-500">{{if .URL}}{{.URL}}{{else}}<span class="text-gray-300">-</span>{{end}}</td>
-                    <td class="px-4 py-3 text-xs text-gray-500">{{if .Icon}}<i class="{{.Icon}}"></i>{{else}}<span class="text-gray-300">-</span>{{end}}</td>
-                    <td class="px-4 py-3 text-xs text-gray-400">{{.OrderNum}}</td>
-                    <td class="px-4 py-3">
+                <tr class="hover:bg-gray-50/50 transition" id="menu-row-{{.ID}}">
+                    <td class="px-3 py-3 text-xs text-gray-400">{{.ID}}</td>
+                    <td class="px-3 py-3">
+                        <input type="text" id="name-{{.ID}}" value="{{.Name}}" class="w-20 border border-gray-200 rounded-lg px-2 py-1 text-sm font-medium text-gray-700 outline-none focus:ring-1 focus:ring-indigo-200">
+                    </td>
+                    <td class="px-3 py-3 text-xs text-gray-500">{{if .URL}}{{.URL}}{{else}}-{{end}}</td>
+                    <td class="px-3 py-3">
+                        <input type="text" id="icon-{{.ID}}" value="{{.Icon}}" class="w-32 border border-gray-200 rounded-lg px-2 py-1 text-xs text-gray-500 outline-none focus:ring-1 focus:ring-indigo-200">
+                    </td>
+                    <td class="px-3 py-3">
+                        <input type="number" id="order-{{.ID}}" value="{{.OrderNum}}" class="w-14 border border-gray-200 rounded-lg px-2 py-1 text-xs text-gray-400 outline-none focus:ring-1 focus:ring-indigo-200">
+                    </td>
+                    <td class="px-3 py-3 text-center">
+                        <label class="relative inline-flex items-center cursor-pointer">
+                            <input type="checkbox" id="visible-{{.ID}}" {{if .Visible}}checked{{end}} onchange="updateMenu({{.ID}})" class="sr-only peer">
+                            <div class="w-9 h-5 bg-gray-200 peer-focus:ring-1 peer-focus:ring-indigo-200 rounded-full peer peer-checked:after:translate-x-full rtl:peer-checked:after:-translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:start-[2px] after:bg-white after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-indigo-500"></div>
+                        </label>
+                    </td>
+                    <td class="px-3 py-3 flex items-center gap-2">
+                        <button onclick="updateMenu({{.ID}})" class="text-xs text-indigo-500 hover:text-indigo-700"><i class="fa-solid fa-check"></i> 保存</button>
+                        {{if not .IsSystem}}
                         <button onclick="confirmAction('确定删除此菜单？', '/admin/menus/delete/{{.ID}}')" class="text-xs text-red-400 hover:text-red-600"><i class="fa-solid fa-trash"></i></button>
+                        {{else}}
+                        <span class="text-[10px] text-gray-300 px-1.5 py-0.5 bg-gray-50 rounded">系统</span>
+                        {{end}}
                     </td>
                 </tr>
                 {{end}}
             </tbody>
         </table>
-        {{if eq (len .Menus) 0}}<div class="text-center py-8 text-sm text-gray-400">暂无菜单</div>{{end}}
+        <div class="text-xs text-gray-400 mt-2"><i class="fa-solid fa-circle-info mr-1"></i>系统菜单不可删除，可修改名称、图标、排序和显示状态</div>
     </div>
+
+    <script>
+        function updateMenu(id) {
+            var name = document.getElementById('name-' + id).value;
+            var icon = document.getElementById('icon-' + id).value;
+            var order = document.getElementById('order-' + id).value;
+            var visible = document.getElementById('visible-' + id).checked ? '1' : '0';
+            var fd = new FormData();
+            fd.append('id', id);
+            fd.append('name', name);
+            fd.append('icon', icon);
+            fd.append('order_num', order);
+            fd.append('visible', visible);
+            fetch('/admin/menus/update', { method: 'POST', body: fd })
+                .then(r => r.json())
+                .then(data => { if (!data.ok) alert(data.msg || '保存失败'); })
+                .catch(() => alert('网络错误'));
+        }
+    </script>
 {{template "admin_tail" .}}

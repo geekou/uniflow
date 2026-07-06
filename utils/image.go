@@ -193,14 +193,18 @@ func sanitizeFilename(name string) string {
 	return cleaned
 }
 
-// allowedMimeTypes 允许上传的文件 MIME 类型
-var allowedMimeTypes = map[string]bool{
-	"image/jpeg": true, "image/png": true, "image/gif": true,
-	"image/webp": true,
-	"video/mp4":  true, "video/webm": true,
+// allowedMimeTypes 允许上传的文件 MIME 类型。
+// GIF 允许上传，但仍要求 MIME 与 .gif 扩展名匹配，避免内容混淆。
+var allowedMimeTypes = map[string][]string{
+	"image/jpeg": {".jpg", ".jpeg"},
+	"image/png":  {".png"},
+	"image/gif":  {".gif"},
+	"image/webp": {".webp"},
+	"video/mp4":  {".mp4"},
+	"video/webm": {".webm"},
 }
 
-// validateFileType 读取文件头检测 MIME 类型并校验
+// validateFileType 读取文件头检测 MIME 类型，并要求 MIME 与扩展名匹配，降低内容混淆风险。
 func validateFileType(path string) error {
 	f, err := os.Open(path)
 	if err != nil {
@@ -211,8 +215,15 @@ func validateFileType(path string) error {
 	buf := make([]byte, 512)
 	n, _ := f.Read(buf)
 	contentType := http.DetectContentType(buf[:n])
-	if !allowedMimeTypes[contentType] {
+	allowedExts, ok := allowedMimeTypes[contentType]
+	if !ok {
 		return fmt.Errorf("不支持的文件类型: %s", contentType)
 	}
-	return nil
+	ext := strings.ToLower(filepath.Ext(path))
+	for _, allowedExt := range allowedExts {
+		if ext == allowedExt {
+			return nil
+		}
+	}
+	return fmt.Errorf("文件扩展名 %s 与 MIME 类型 %s 不匹配", ext, contentType)
 }

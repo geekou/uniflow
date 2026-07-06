@@ -14,22 +14,101 @@
                 <input type="text" name="site_subtitle" value="{{index .Settings "site_subtitle"}}" class="w-full border border-gray-200 rounded-xl px-4 py-2.5 text-sm outline-none focus:ring-2 focus:ring-indigo-200 focus:border-indigo-400">
             </div>
             <div>
-                <label class="text-xs font-medium text-gray-500 mb-1 block">首页氛围 Banner 图</label>
-                <div class="space-y-2">
-                    <div class="flex items-center gap-3">
-                        <label class="flex-shrink-0 bg-indigo-50 text-indigo-600 text-xs font-medium px-4 py-2 rounded-xl cursor-pointer hover:bg-indigo-100 transition">
-                            <i class="fa-solid fa-cloud-arrow-up mr-1"></i>上传图片
-                            <input type="file" name="banner_file" accept="image/*" class="hidden" onchange="previewBanner(this)">
-                        </label>
-                        <span class="text-[11px] text-gray-400">或填写图片 URL：</span>
+                <label class="text-xs font-medium text-gray-500 mb-1 block">氛围 Banner 图设置</label>
+                <!-- 全局开关 -->
+                <div class="bg-amber-50 border border-amber-200/60 rounded-xl p-3 mb-3 flex items-center justify-between">
+                    <div>
+                        <p class="text-xs font-medium text-amber-800">所有页面使用首页 Banner</p>
+                        <p class="text-[10px] text-amber-600 mt-0.5">打开后，文章/瞬间/留言板页面将统一使用下方"首页"的 Banner 图</p>
                     </div>
-                    <input type="text" name="banner_url" id="banner_url_input" value="{{index .Settings "banner_url"}}" placeholder="https://example.com/banner.jpg 或 /uploads/xxx.jpg" class="w-full border border-gray-200 rounded-xl px-4 py-2.5 text-sm outline-none focus:ring-2 focus:ring-indigo-200 focus:border-indigo-400">
-                    <div id="banner-preview" class="relative overflow-hidden rounded-xl h-32 bg-gray-50 border border-gray-100">
-                        {{if index .Settings "banner_url"}}
-                        <img src="{{index .Settings "banner_url"}}" class="w-full h-full object-cover" alt="banner preview">
-                        {{else}}
-                        <div class="w-full h-full flex items-center justify-center text-gray-300 text-xs"><i class="fa-regular fa-image text-2xl mr-2"></i>暂未设置 Banner，默认使用置顶文章封面</div>
-                        {{end}}
+                    <label class="relative inline-flex items-center cursor-pointer flex-shrink-0 ml-3">
+                        <input type="checkbox" name="banner_use_homepage" value="true" class="sr-only peer"
+                            {{if ne (index .Settings "banner_use_homepage") "false"}}checked{{end}}
+                            onchange="togglePageBanners()">
+                        <div class="w-10 h-5 bg-gray-200 peer-focus:ring-2 peer-focus:ring-amber-300 rounded-full peer peer-checked:after:translate-x-full after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-amber-500"></div>
+                    </label>
+                </div>
+                <!-- Banner 页面卡片 -->
+                <div id="page-banners" class="grid grid-cols-1 lg:grid-cols-2 gap-3">
+                    <!-- 首页 -->
+                    <div class="bg-gray-50/70 rounded-xl p-3 border border-gray-100/80">
+                        <h4 class="text-xs font-semibold text-gray-600 mb-2 flex items-center gap-1.5"><span class="w-1 h-4 bg-indigo-400 rounded-full inline-block"></span>首页</h4>
+                        <div class="space-y-1.5">
+                            <div class="flex items-center gap-2">
+                                <label class="flex-shrink-0 bg-indigo-50 text-indigo-600 text-[11px] font-medium px-3 py-1.5 rounded-lg cursor-pointer hover:bg-indigo-100 transition">
+                                    <i class="fa-solid fa-cloud-arrow-up mr-1"></i>上传
+                                    <input type="file" name="banner_file" accept="image/*" class="hidden" onchange="previewBanner(this, 'banner-preview-index')">
+                                </label>
+                                <input type="text" name="banner_url" placeholder="或填写 URL" value="{{safeImageURL (index .Settings "banner_url")}}" class="flex-1 border border-gray-200 rounded-lg px-2.5 py-1.5 text-[11px] outline-none focus:ring-1 focus:ring-indigo-200 focus:border-indigo-400">
+                            </div>
+                            <div id="banner-preview-index" class="overflow-hidden rounded-lg h-20 bg-gray-100 border border-gray-100">
+                                {{if index .Settings "banner_url"}}
+                                <img loading="lazy" src="{{safeImageURL (index .Settings "banner_url")}}" class="w-full h-full object-cover">
+                                {{else}}
+                                <div class="w-full h-full flex items-center justify-center text-gray-300 text-[10px]"><i class="fa-regular fa-image mr-1"></i>默认使用置顶文章封面</div>
+                                {{end}}
+                            </div>
+                        </div>
+                    </div>
+                    <!-- 文章页 -->
+                    <div class="bg-gray-50/70 rounded-xl p-3 border border-gray-100/80 page-banner-item">
+                        <h4 class="text-xs font-semibold text-gray-600 mb-2 flex items-center gap-1.5"><span class="w-1 h-4 bg-blue-400 rounded-full inline-block"></span>文章页</h4>
+                        <div class="space-y-1.5">
+                            <div class="flex items-center gap-2">
+                                <label class="flex-shrink-0 bg-blue-50 text-blue-600 text-[11px] font-medium px-3 py-1.5 rounded-lg cursor-pointer hover:bg-blue-100 transition">
+                                    <i class="fa-solid fa-cloud-arrow-up mr-1"></i>上传
+                                    <input type="file" name="banner_file_posts" accept="image/*" class="hidden" onchange="previewBanner(this, 'banner-preview-posts')">
+                                </label>
+                                <input type="text" name="banner_url_posts" placeholder="或填写 URL" value="{{safeImageURL (index .Settings "banner_url_posts")}}" class="flex-1 border border-gray-200 rounded-lg px-2.5 py-1.5 text-[11px] outline-none focus:ring-1 focus:ring-blue-200 focus:border-blue-400">
+                            </div>
+                            <div id="banner-preview-posts" class="overflow-hidden rounded-lg h-20 bg-gray-100 border border-gray-100">
+                                {{if index .Settings "banner_url_posts"}}
+                                <img loading="lazy" src="{{safeImageURL (index .Settings "banner_url_posts")}}" class="w-full h-full object-cover">
+                                {{else}}
+                                <div class="w-full h-full flex items-center justify-center text-gray-300 text-[10px]"><i class="fa-regular fa-image mr-1"></i>未设置则用首页 Banner</div>
+                                {{end}}
+                            </div>
+                        </div>
+                    </div>
+                    <!-- 瞬间页 -->
+                    <div class="bg-gray-50/70 rounded-xl p-3 border border-gray-100/80 page-banner-item">
+                        <h4 class="text-xs font-semibold text-gray-600 mb-2 flex items-center gap-1.5"><span class="w-1 h-4 bg-emerald-400 rounded-full inline-block"></span>瞬间页</h4>
+                        <div class="space-y-1.5">
+                            <div class="flex items-center gap-2">
+                                <label class="flex-shrink-0 bg-emerald-50 text-emerald-600 text-[11px] font-medium px-3 py-1.5 rounded-lg cursor-pointer hover:bg-emerald-100 transition">
+                                    <i class="fa-solid fa-cloud-arrow-up mr-1"></i>上传
+                                    <input type="file" name="banner_file_moments" accept="image/*" class="hidden" onchange="previewBanner(this, 'banner-preview-moments')">
+                                </label>
+                                <input type="text" name="banner_url_moments" placeholder="或填写 URL" value="{{safeImageURL (index .Settings "banner_url_moments")}}" class="flex-1 border border-gray-200 rounded-lg px-2.5 py-1.5 text-[11px] outline-none focus:ring-1 focus:ring-emerald-200 focus:border-emerald-400">
+                            </div>
+                            <div id="banner-preview-moments" class="overflow-hidden rounded-lg h-20 bg-gray-100 border border-gray-100">
+                                {{if index .Settings "banner_url_moments"}}
+                                <img loading="lazy" src="{{safeImageURL (index .Settings "banner_url_moments")}}" class="w-full h-full object-cover">
+                                {{else}}
+                                <div class="w-full h-full flex items-center justify-center text-gray-300 text-[10px]"><i class="fa-regular fa-image mr-1"></i>未设置则用首页 Banner</div>
+                                {{end}}
+                            </div>
+                        </div>
+                    </div>
+                    <!-- 留言板 -->
+                    <div class="bg-gray-50/70 rounded-xl p-3 border border-gray-100/80 page-banner-item">
+                        <h4 class="text-xs font-semibold text-gray-600 mb-2 flex items-center gap-1.5"><span class="w-1 h-4 bg-rose-400 rounded-full inline-block"></span>留言板</h4>
+                        <div class="space-y-1.5">
+                            <div class="flex items-center gap-2">
+                                <label class="flex-shrink-0 bg-rose-50 text-rose-600 text-[11px] font-medium px-3 py-1.5 rounded-lg cursor-pointer hover:bg-rose-100 transition">
+                                    <i class="fa-solid fa-cloud-arrow-up mr-1"></i>上传
+                                    <input type="file" name="banner_file_guestbook" accept="image/*" class="hidden" onchange="previewBanner(this, 'banner-preview-guestbook')">
+                                </label>
+                                <input type="text" name="banner_url_guestbook" placeholder="或填写 URL" value="{{safeImageURL (index .Settings "banner_url_guestbook")}}" class="flex-1 border border-gray-200 rounded-lg px-2.5 py-1.5 text-[11px] outline-none focus:ring-1 focus:ring-rose-200 focus:border-rose-400">
+                            </div>
+                            <div id="banner-preview-guestbook" class="overflow-hidden rounded-lg h-20 bg-gray-100 border border-gray-100">
+                                {{if index .Settings "banner_url_guestbook"}}
+                                <img loading="lazy" src="{{safeImageURL (index .Settings "banner_url_guestbook")}}" class="w-full h-full object-cover">
+                                {{else}}
+                                <div class="w-full h-full flex items-center justify-center text-gray-300 text-[10px]"><i class="fa-regular fa-image mr-1"></i>未设置则用首页 Banner</div>
+                                {{end}}
+                            </div>
+                        </div>
                     </div>
                 </div>
             </div>
@@ -57,6 +136,15 @@
                 <input type="datetime-local" name="site_founded_at" value="{{index .Settings "site_founded_at"}}" class="w-full border border-gray-200 rounded-xl px-4 py-2.5 text-sm outline-none focus:ring-2 focus:ring-indigo-200 focus:border-indigo-400">
                 <p class="text-[11px] text-gray-400 mt-1">设置后，前台和后台侧边栏将显示建站运行时长</p>
             </div>
+            <div>
+                <label class="text-xs font-medium text-gray-500 mb-1 block">高德地图 Key</label>
+                <input type="text" name="amap_key" value="{{index .Settings "amap_key"}}" placeholder="前往 https://lbs.amap.com 申请 Web端 JS API Key" class="w-full border border-gray-200 rounded-xl px-4 py-2.5 text-sm outline-none focus:ring-2 focus:ring-indigo-200 focus:border-indigo-400">
+                <p class="text-[11px] text-gray-400 mt-1">用于「关于我」页面的足迹地图</p>
+            </div>
+            <div>
+                <label class="text-xs font-medium text-gray-500 mb-1 block">高德安全密钥</label>
+                <input type="text" name="amap_jscode" value="{{index .Settings "amap_jscode"}}" placeholder="高德控制台 → 应用管理 → 查看安全密钥（jscode）" class="w-full border border-gray-200 rounded-xl px-4 py-2.5 text-sm outline-none focus:ring-2 focus:ring-indigo-200 focus:border-indigo-400">
+            </div>
         </div>
 
         <!-- 赞赏收款码 -->
@@ -71,9 +159,10 @@
                             <i class="fa-brands fa-weixin mr-1.5"></i>上传微信码
                             <input type="file" name="wechat_qr_file" accept="image/*" class="hidden" onchange="previewQR(this, 'wechat-preview')">
                         </label>
+                        {{if index .Settings "wechat_qr"}}<input type="hidden" name="wechat_qr" value="{{safeImageURL (index .Settings "wechat_qr")}}">{{end}}
                         <div id="wechat-preview" class="w-28 h-28 rounded-xl border border-gray-100 bg-gray-50 flex items-center justify-center overflow-hidden">
                             {{if index .Settings "wechat_qr"}}
-                            <img src="{{index .Settings "wechat_qr"}}" class="w-full h-full object-cover">
+                            <img loading="lazy" src="{{safeImageURL (index .Settings "wechat_qr")}}" class="w-full h-full object-cover">
                             {{else}}
                             <span class="text-gray-300 text-[10px]">未上传</span>
                             {{end}}
@@ -87,9 +176,10 @@
                             <i class="fa-brands fa-alipay mr-1.5"></i>上传支付宝码
                             <input type="file" name="alipay_qr_file" accept="image/*" class="hidden" onchange="previewQR(this, 'alipay-preview')">
                         </label>
+                        {{if index .Settings "alipay_qr"}}<input type="hidden" name="alipay_qr" value="{{safeImageURL (index .Settings "alipay_qr")}}">{{end}}
                         <div id="alipay-preview" class="w-28 h-28 rounded-xl border border-gray-100 bg-gray-50 flex items-center justify-center overflow-hidden">
                             {{if index .Settings "alipay_qr"}}
-                            <img src="{{index .Settings "alipay_qr"}}" class="w-full h-full object-cover">
+                            <img loading="lazy" src="{{safeImageURL (index .Settings "alipay_qr")}}" class="w-full h-full object-cover">
                             {{else}}
                             <span class="text-gray-300 text-[10px]">未上传</span>
                             {{end}}
@@ -113,22 +203,32 @@
         </div>
 
     <script>
-    function previewBanner(input) {
-        var preview = document.getElementById('banner-preview');
+    function previewBanner(input, previewId) {
+        var preview = document.getElementById(previewId);
         if (input.files && input.files[0]) {
             var reader = new FileReader();
             reader.onload = function(e) {
-                preview.innerHTML = '<img src="' + e.target.result + '" class="w-full h-full object-cover" alt="banner preview">';
+                preview.innerHTML = '<img loading="lazy" src="' + e.target.result + '" class="w-full h-full object-cover">';
             };
             reader.readAsDataURL(input.files[0]);
         }
     }
+    function togglePageBanners() {
+        var checkbox = document.querySelector('input[name="banner_use_homepage"]');
+        var items = document.querySelectorAll('.page-banner-item');
+        items.forEach(function(item) {
+            item.style.opacity = checkbox.checked ? '0.45' : '1';
+            item.style.pointerEvents = checkbox.checked ? 'none' : 'auto';
+        });
+    }
+    // 初始状态
+    togglePageBanners();
     function previewQR(input, previewId) {
         var preview = document.getElementById(previewId);
         if (input.files && input.files[0]) {
             var reader = new FileReader();
             reader.onload = function(e) {
-                preview.innerHTML = '<img src="' + e.target.result + '" class="w-full h-full object-cover">';
+                preview.innerHTML = '<img loading="lazy" src="' + e.target.result + '" class="w-full h-full object-cover">';
             };
             reader.readAsDataURL(input.files[0]);
         }

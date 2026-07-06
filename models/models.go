@@ -47,7 +47,16 @@ type Comment struct {
 	ImageURL     string    `json:"image_url"`
 	ParentID     int64     `json:"parent_id"` // 回复的父评论ID，0表示顶级评论
 	ReplyTo      string    `json:"reply_to"`  // 回复的目标作者名（模板渲染用）
+	Likes        int64     `json:"likes"`
 	CreatedAt    time.Time `json:"created_at"`
+}
+
+// CommentLike 评论点赞记录
+type CommentLike struct {
+	ID          int64     `json:"id"`
+	CommentID   int64     `json:"comment_id"`
+	AnonymousID string    `json:"anonymous_id"`
+	CreatedAt   time.Time `json:"created_at"`
 }
 
 // Category 分类模型
@@ -83,6 +92,8 @@ type Menu struct {
 	Icon     string `json:"icon"` // FontAwesome 类名
 	ParentID *int64 `json:"parent_id"`
 	OrderNum int    `json:"order_num"`
+	IsSystem bool   `json:"is_system"` // 系统默认菜单，不可删除
+	Visible  bool   `json:"visible"`   // 是否在前台显示
 	// 子菜单
 	Children []Menu `json:"children,omitempty"`
 }
@@ -134,6 +145,16 @@ type MomentView struct {
 	CreatedAt    time.Time `json:"created_at"`
 	Comments     []Comment `json:"comments"`
 	CommentCount int       `json:"comment_count"`
+}
+
+// Device 设备展示模型
+type Device struct {
+	ID        int64     `json:"id"`
+	Name      string    `json:"name"`
+	ImageURL  string    `json:"image_url"`
+	Info      string    `json:"info"`
+	OrderNum  int       `json:"order_num"`
+	CreatedAt time.Time `json:"created_at"`
 }
 
 // PageView 自定义页面视图模型（带 HTMLContent）

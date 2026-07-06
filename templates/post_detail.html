@@ -3,12 +3,15 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link rel="alternate" type="application/rss+xml" title="{{.SiteTitle}} RSS" href="/rss">
     <title>{{.Post.Title}} - {{.SiteTitle}}</title>
-    <script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4"></script>
+    <link href="/static/css/dark.css" rel="stylesheet">
+    <link href="/static/css/tailwind.css" rel="stylesheet">
+    <script src="/static/vendor/tailwindcss.js"></script>
     <script src="https://code.iconify.design/3/3.1.0/iconify.min.js"></script>
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
-    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/glightbox@3.3.0/dist/css/glightbox.min.css">
-    <script src="https://cdn.jsdelivr.net/npm/glightbox@3.3.0/dist/js/glightbox.min.js"></script>
+    <link rel="stylesheet" href="/static/vendor/fontawesome/css/all.min.css">
+    <link rel="stylesheet" href="/static/vendor/glightbox/glightbox.min.css">
+    <script src="/static/vendor/glightbox/glightbox.min.js"></script>
     <style>
         body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif; }
         .no-scrollbar::-webkit-scrollbar { display: none; }
@@ -17,6 +20,8 @@
         .prose img:hover { transform: scale(1.02); box-shadow: 0 8px 30px rgba(0,0,0,0.1); }
         input:focus, textarea:focus { outline: none; }
         .input-glow:focus { box-shadow: 0 0 0 3px rgba(99,102,241,0.15); border-color: #818cf8; }
+        .btn-voted { cursor: default !important; opacity: 0.6; pointer-events: none; }
+        .btn-voted i { color: #f97316 !important; }
         .btn-voted { pointer-events: none; opacity: 0.5; filter: grayscale(0.5); }
         @keyframes spin { to { transform: rotate(360deg); } }
         .spinner { display: inline-block; width: 1rem; height: 1rem; border: 2px solid #fff; border-top-color: transparent; border-radius: 50%; animation: spin 0.6s linear infinite; vertical-align: middle; margin-right: 0.25rem; }
@@ -68,131 +73,36 @@
         #back-to-top.show { opacity: 1; visibility: visible; transform: translateY(0); }
         #back-to-top:hover { background: rgba(79,70,229,1); transform: translateY(-2px); }
     </style>
-    <script src="https://cdn.jsdelivr.net/npm/qrcode-generator@1.4.4/qrcode.min.js"></script>
+    <script src="/static/vendor/qrcode.js"></script>
 </head>
 <body class="bg-[#F4F6F9] text-gray-800 min-h-screen">
     <!-- 阅读进度条 -->
     <div id="reading-progress" class="fixed top-0 left-0 h-0.5 bg-gradient-to-r from-indigo-400 to-purple-500 z-[60] transition-all duration-150" style="width:0%"></div>
 
-    <!-- 通知弹窗（全局） -->
-    <div id="notification-panel" style="display:none;position:fixed;top:56px;right:16px;z-index:9999;width:288px;background:#fff;border-radius:16px;box-shadow:0 8px 30px rgba(0,0,0,0.12);border:1px solid #f3f4f6;padding:16px;opacity:0;transition:opacity 0.3s,transform 0.3s;transform:translateX(20px)">
-        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">
-            <span style="font-size:11px;font-weight:700;color:#6b7280"><i class="fa-solid fa-bullhorn" style="color:#6366f1;margin-right:4px"></i>站点通知</span>
-            <button onclick="toggleNotification()" style="font-size:12px;color:#9ca3af;border:none;background:none;cursor:pointer"><i class="fa-solid fa-xmark"></i></button>
-        </div>
+{{template "partials/notification" .}}
+
         <p style="font-size:14px;color:#374151;line-height:1.6">{{.SiteNotification}}</p>
     </div>
 
-    <!-- ========== 移动端顶栏（含搜索框） ========== -->
-    <div class="md:hidden bg-white px-3 py-2 shadow-xs border-b border-gray-100 sticky top-0 z-40 space-y-2">
-        <div class="flex items-center justify-between">
-            <div class="flex items-center space-x-2">
-                <button id="open-sidebar" class="text-gray-600 p-1 text-lg active:scale-95 transition">
-                    <i class="fa-solid fa-bars"></i>
-                </button>
-                <span class="font-bold text-base tracking-tight text-indigo-600">{{.SiteTitle}}</span>
-            </div>
-            <div class="flex items-center space-x-3">
-                {{if .SiteNotification}}
-                <button onclick="toggleNotification()" class="text-gray-500 hover:text-indigo-600 transition relative"><i class="fa-regular fa-bell text-sm"></i><span class="notify-dot absolute top-0 right-0 w-1.5 h-1.5 bg-red-500 rounded-full animate-pulse"></span></button>
-                {{else}}
-                <button class="text-gray-300 cursor-default relative"><i class="fa-regular fa-bell text-sm"></i></button>
-                {{end}}
-                <a href="/admin" class="block"><img class="w-7 h-7 rounded-full border hover:ring-2 hover:ring-indigo-300 transition" src="{{if .AboutMe.Avatar}}{{.AboutMe.Avatar}}{{else}}https://api.dicebear.com/7.x/adventurer/svg?seed={{defaultName .AboutMe.Name}}{{end}}" alt="user"></a>
-            </div>
-        </div>
-        <form action="/search" method="get" class="flex items-center space-x-2 bg-gray-50 px-3 py-1.5 rounded-xl border border-gray-100">
-            <i class="fa-solid fa-magnifying-glass text-gray-400 text-xs"></i>
-            <input type="text" name="q" placeholder="搜索文章、分类或标签..." class="bg-transparent text-sm w-full outline-none text-gray-600 placeholder-gray-400" value="">
-        </form>
-    </div>
-
-    <!-- 移动端遮罩 -->
-    <div id="sidebar-overlay" class="fixed inset-0 bg-black/40 z-50 invisible opacity-0 transition-opacity duration-300 md:hidden"></div>
+{{template "partials/mobile-header" .}}
 
     <!-- ========== 主容器 ========== -->
     <div class="max-w-[1400px] mx-auto px-4 py-6">
         <div class="tri-scroll-layout grid grid-cols-1 md:grid-cols-4 lg:grid-cols-5 gap-6 items-start">
 
-            <!-- ==================== 左侧栏 ==================== -->
-            <aside id="sidebar" class="tri-scroll-column fixed top-0 left-0 bottom-0 w-72 bg-white p-6 z-50 transform -translate-x-full transition-transform duration-300 ease-in-out md:relative md:translate-x-0 md:w-auto md:p-6 md:rounded-3xl md:shadow-xs md:border md:border-gray-100/50 space-y-6 flex flex-col justify-between overflow-y-auto md:overflow-y-visible no-scrollbar h-screen md:h-auto">
-                <div class="space-y-6">
-                    <div class="flex items-center justify-between md:hidden pb-2 border-b border-gray-50">
-                        <span class="font-bold text-gray-400 text-xs tracking-wider">导航菜单</span>
-                        <button id="close-sidebar" class="text-gray-400 hover:text-gray-600 p-1 text-lg"><i class="fa-solid fa-xmark"></i></button>
-                    </div>
-                    <div class="flex items-center space-x-3 px-2">
-                        <div class="w-10 h-10 bg-indigo-600 rounded-xl flex items-center justify-center text-white font-bold text-xl shadow-md shadow-indigo-200">U</div>
-                        <div>
-                            <h1 class="text-lg font-bold tracking-tight">{{.SiteTitle}}</h1>
-                            <p class="text-xs text-gray-400">{{.SiteSubtitle}}</p>
-                        </div>
-                    </div>
-                    <nav class="space-y-1">
-                        {{range .Menus}}
-                        <a href="{{if eq .URL ""}}/{{else}}{{.URL}}{{end}}" class="flex items-center space-x-3 px-4 py-3 rounded-xl transition {{if eq $.ActiveMenu .URL}}bg-indigo-50 text-indigo-600 font-semibold{{else}}text-gray-600 hover:bg-gray-50 hover:text-indigo-600 font-medium{{end}}">
-                            {{if .Icon}}<i class="{{.Icon}} text-sm"></i>{{end}} <span>{{.Name}}</span>
-                        </a>
-                        {{end}}
-                    </nav>
-                    <div class="space-y-3">
-                        <h3 class="text-xs font-bold text-gray-400 px-1 tracking-wider">站点统计</h3>
-                        <div class="grid grid-cols-2 gap-3 text-sm">
-                            <div class="bg-gray-50 p-2.5 rounded-xl"><p class="text-xs text-gray-400">文章数</p><p class="text-base font-bold mt-0.5">{{.Stats.PostCount}}</p></div>
-                            <div class="bg-gray-50 p-2.5 rounded-xl"><p class="text-xs text-gray-400">分类数</p><p class="text-base font-bold mt-0.5">{{.Stats.CategoryCount}}</p></div>
-                            <div class="bg-gray-50 p-2.5 rounded-xl"><p class="text-xs text-gray-400">标签数</p><p class="text-base font-bold mt-0.5">{{.Stats.TagCount}}</p></div>
-                            <div class="bg-gray-50 p-2.5 rounded-xl"><p class="text-xs text-gray-400">评论数</p><p class="text-base font-bold mt-0.5">{{.Stats.CommentCount}}</p></div>
-                        </div>
-                        <div class="bg-gray-50 p-2.5 rounded-xl flex justify-between items-center text-sm">
-                            <span class="text-xs text-gray-400">访问量</span>
-                            <span class="font-bold">{{.Stats.TotalViews}}</span>
-                        </div>
-                    </div>
-                </div>
-
-                <!-- 建站计时 -->
-                <div id="site-uptime" data-founded="{{.SiteFoundedAt}}">
-                    <h3 class="text-xs font-bold text-gray-400 px-1 tracking-wider mb-2">本站已运行</h3>
-                    <div class="bg-white rounded-xl px-3 py-2.5 flex items-baseline justify-center gap-0.5 font-mono text-lg tracking-tight border border-gray-100">
-                        <span id="site-uptime-d" class="text-indigo-600 font-bold">0</span><span class="text-gray-400 text-xs mr-1">天</span>
-                        <span id="site-uptime-h" class="text-indigo-600 font-bold">00</span><span class="text-gray-300 animate-pulse">:</span>
-                        <span id="site-uptime-m" class="text-indigo-600 font-bold">00</span><span class="text-gray-300 animate-pulse">:</span>
-                        <span id="site-uptime-s" class="text-indigo-600 font-bold">00</span>
-                    </div>
-                </div>
-
-                <footer class="text-center text-xs text-gray-400 space-y-2 pt-6 border-t border-gray-50">
-                    <p>&copy; 2026 {{.SiteTitle}}</p>
-                    <p class="text-[10px]">Powered by UniFlow</p>
-                </footer>
-            </aside>
-
+            {{template "partials/sidebar" .}}
             <!-- ==================== 中间主内容 ==================== -->
             <main class="tri-scroll-column col-span-1 md:col-span-3 lg:col-span-3 min-w-0 space-y-6">
 
-                <!-- 搜索栏（大屏） -->
-                <div class="hidden md:flex bg-white rounded-2xl p-3 shadow-xs border border-gray-100/50 items-center justify-between">
-                    <form action="/search" method="get" class="flex items-center space-x-3 flex-1 max-w-lg bg-gray-50 px-4 py-2 rounded-xl border border-gray-100">
-                        <i class="fa-solid fa-magnifying-glass text-gray-400 text-sm"></i>
-                        <input type="text" name="q" placeholder="搜索文章、分类或标签..." class="bg-transparent text-sm w-full outline-none text-gray-600 placeholder-gray-400" value="">
-                    </form>
-                    <div class="flex items-center space-x-4 pl-4">
-                        {{if .SiteNotification}}
-                        <button onclick="toggleNotification()" class="text-gray-500 hover:text-indigo-600 transition relative"><i class="fa-regular fa-bell text-lg"></i><span class="notify-dot absolute top-0 right-0 w-1.5 h-1.5 bg-red-500 rounded-full animate-pulse"></span></button>
-                        {{else}}
-                        <button class="text-gray-300 cursor-default relative"><i class="fa-regular fa-bell text-lg"></i></button>
-                        {{end}}
-                        <a href="/admin" class="block"><img class="w-8 h-8 rounded-full border hover:ring-2 hover:ring-indigo-300 transition" src="{{if .AboutMe.Avatar}}{{.AboutMe.Avatar}}{{else}}https://api.dicebear.com/7.x/adventurer/svg?seed={{defaultName .AboutMe.Name}}{{end}}" alt="user"></a>
-                    </div>
-                </div>
+                {{template "partials/searchbar" .}}
 
                 <!-- 面包屑 -->
-                <div class="flex items-center gap-2 text-sm text-gray-500">
+                <div class="flex items-center gap-1.5 text-sm text-gray-500 mb-2">
                     <a href="/" class="hover:text-indigo-500 transition">首页</a>
-                    <span class="iconify" data-icon="mdi:chevron-right" data-width="16"></span>
+                    <i class="fa-solid fa-chevron-right text-[10px] text-gray-400"></i>
                     {{if .Post.CategoryName}}
                     <a href="/posts?category={{.Post.CategorySlug}}" class="hover:text-indigo-500 transition">{{.Post.CategoryName}}</a>
-                    <span class="iconify" data-icon="mdi:chevron-right" data-width="16"></span>
+                    <i class="fa-solid fa-chevron-right text-[10px] text-gray-400"></i>
                     {{end}}
                     <span class="text-gray-900 font-medium truncate max-w-xs">{{.Post.Title}}</span>
                 </div>
@@ -202,7 +112,7 @@
                     <!-- 封面图 -->
                     {{if .Post.ThumbURL}}
                     <div class="aspect-video overflow-hidden">
-                        <img src="{{.Post.ThumbURL}}" alt="{{.Post.Title}}" class="w-full h-full object-cover">
+                        <img loading="lazy" src="{{safeImageURL .Post.ThumbURL}}" alt="{{.Post.Title}}" class="w-full h-full object-cover">
                     </div>
                     {{end}}
 
@@ -212,19 +122,19 @@
                         <!-- 文章元信息 -->
                         <div class="flex flex-wrap items-center gap-4 text-sm text-gray-500 mb-6 pb-6 border-b border-gray-100">
                             <div class="flex items-center gap-1.5">
-                                <span class="iconify" data-icon="mdi:account-outline" data-width="16"></span>
+                                <i class="fa-regular fa-user"></i>
                                 <span>{{.Post.Author}}</span>
                             </div>
                             <div class="flex items-center gap-1.5">
-                                <span class="iconify" data-icon="mdi:calendar-outline" data-width="16"></span>
+                                <i class="fa-regular fa-calendar"></i>
                                 <time>{{formatDate .Post.CreatedAt}}</time>
                             </div>
                             <div class="flex items-center gap-1.5">
-                                <span class="iconify" data-icon="mdi:eye-outline" data-width="16"></span>
+                                <i class="fa-regular fa-eye"></i>
                                 <span>{{.Post.Views}} 阅读</span>
                             </div>
                             <div class="flex items-center gap-1.5">
-                                <span class="iconify" data-icon="mdi:comment-outline" data-width="16"></span>
+                                <i class="fa-regular fa-comment"></i>
                                 <span>{{.Post.CommentCount}} 评论</span>
                             </div>
                             {{$wc := wordCount .Post.Content}}
@@ -269,13 +179,13 @@
                                         <div class="{{if and .WechatQR .AlipayQR}}grid grid-cols-2{{else}}flex justify-center{{end}} gap-3">
                                             {{if .WechatQR}}
                                             <div class="text-center">
-                                                <img src="{{.WechatQR}}" class="w-28 h-28 rounded-xl object-cover mx-auto border border-gray-100">
+                                                <img loading="lazy" src="{{safeImageURL .WechatQR}}" class="w-28 h-28 rounded-xl object-cover mx-auto border border-gray-100">
                                                 <p class="text-[11px] text-gray-400 mt-1.5"><i class="fa-brands fa-weixin text-green-500 mr-0.5"></i>微信</p>
                                             </div>
                                             {{end}}
                                             {{if .AlipayQR}}
                                             <div class="text-center">
-                                                <img src="{{.AlipayQR}}" class="w-28 h-28 rounded-xl object-cover mx-auto border border-gray-100">
+                                                <img loading="lazy" src="{{safeImageURL .AlipayQR}}" class="w-28 h-28 rounded-xl object-cover mx-auto border border-gray-100">
                                                 <p class="text-[11px] text-gray-400 mt-1.5"><i class="fa-brands fa-alipay text-blue-500 mr-0.5"></i>支付宝</p>
                                             </div>
                                             {{end}}
@@ -333,9 +243,9 @@
                 <div class="mt-6 grid grid-cols-2 gap-4">
                     {{if .PrevPost}}
                     <a href="/post/{{.PrevPost.ID}}" class="group flex items-start gap-3 p-4 bg-white rounded-xl shadow-sm hover:shadow-md hover:-translate-y-0.5 transition-all">
-                        <span class="iconify text-gray-300 group-hover:text-indigo-400 mt-0.5 shrink-0" data-icon="mdi:chevron-left" data-width="20"></span>
+                        <span class="text-gray-300 group-hover:text-indigo-400 mt-0.5 shrink-0"><i class="fa-solid fa-chevron-left"></i></span>
                         <div class="min-w-0">
-                            <p class="text-[10px] text-gray-400 uppercase tracking-wide">上一篇</p>
+                            <p class="text-[11px] text-gray-400 uppercase tracking-wide">上一篇</p>
                             <p class="text-sm font-medium text-gray-700 group-hover:text-indigo-500 line-clamp-1 transition">{{.PrevPost.Title}}</p>
                         </div>
                     </a>
@@ -348,15 +258,15 @@
                     {{if .NextPost}}
                     <a href="/post/{{.NextPost.ID}}" class="group flex items-start gap-3 p-4 bg-white rounded-xl shadow-sm hover:shadow-md hover:-translate-y-0.5 transition-all text-right">
                         <div class="min-w-0 flex-1">
-                            <p class="text-[10px] text-gray-400 uppercase tracking-wide">下一篇</p>
+                            <p class="text-[11px] text-gray-400 uppercase tracking-wide">下一篇</p>
                             <p class="text-sm font-medium text-gray-700 group-hover:text-indigo-500 line-clamp-1 transition">{{.NextPost.Title}}</p>
                         </div>
-                        <span class="iconify text-gray-300 group-hover:text-indigo-400 mt-0.5 shrink-0" data-icon="mdi:chevron-right" data-width="20"></span>
+                        <span class="text-gray-300 group-hover:text-indigo-400 mt-0.5 shrink-0"><i class="fa-solid fa-chevron-right"></i></span>
                     </a>
                     {{else}}
                     <div class="flex items-center justify-end gap-2 p-4 bg-white rounded-xl border border-gray-100 opacity-30">
                         <p class="text-sm text-gray-400">下一篇暂无</p>
-                        <span class="iconify text-gray-300 shrink-0" data-icon="mdi:chevron-right" data-width="20"></span>
+                        <span class="text-gray-300 shrink-0"><i class="fa-solid fa-chevron-right"></i></span>
                     </div>
                     {{end}}
                 </div>
@@ -372,7 +282,7 @@
                         {{range .RelatedPosts}}
                         <a href="/post/{{.ID}}" class="group bg-white rounded-xl p-3 border border-gray-100 hover:border-indigo-200 hover:shadow-sm transition-all">
                             <h3 class="text-xs font-medium text-gray-700 group-hover:text-indigo-500 transition line-clamp-2">{{.Title}}</h3>
-                            <p class="text-[10px] text-gray-400 mt-1">{{formatDate .CreatedAt}} · {{.CommentCount}} 评论</p>
+                            <p class="text-[11px] text-gray-400 mt-1">{{formatDate .CreatedAt}} · {{.CommentCount}} 评论</p>
                         </a>
                         {{end}}
                     </div>
@@ -380,19 +290,20 @@
                 {{end}}
 
 <!-- 评论区 -->
-                        <div class="mt-4 pt-4 border-t border-gray-100">
+                        <div id="comments" class="mt-4 pt-4 border-t border-gray-100 scroll-mt-6">
                             <h2 class="text-base font-bold text-gray-700 mb-5 flex items-center gap-2">
-                                <span class="iconify text-indigo-400" data-icon="mdi:comment-multiple-outline" data-width="20"></span>
+                                <i class="fa-regular fa-comments text-indigo-400"></i>
                                 评论 ({{len .PostComments}})
                             </h2>
 
-                            <!-- 评论列表（嵌套展示） -->
+                            <!-- 评论列表（自适应：少则撑开，超过5条可滚动） -->
                             {{if .PostComments}}
-                            <div class="space-y-3 mb-6">
+                            <div class="comment-scroll-box space-y-3 max-h-[26rem] overflow-y-auto pr-1 mb-6">
                                 {{range .PostComments}}
                                 {{if eq .ParentID 0}}
-                                <div class="flex gap-3 p-4 bg-white rounded-2xl border border-gray-100 hover:border-gray-200 transition-colors">
-                                    {{if .AuthorAvatar}}<img src="{{.AuthorAvatar}}" class="w-9 h-9 rounded-full object-cover ring-1 ring-gray-100 shrink-0">
+                                <div class="flex gap-3 p-3 bg-white rounded-xl hover:bg-gray-50 transition-colors">
+                                    {{$avatarURL := safeURL .AuthorAvatar}}
+                                    {{if $avatarURL}}<img loading="lazy" src="{{$avatarURL}}" class="w-9 h-9 rounded-full object-cover ring-1 ring-gray-100 shrink-0">
                                     {{else}}<div class="w-9 h-9 rounded-full bg-gradient-to-br from-indigo-400 to-purple-500 ring-1 ring-indigo-200 flex items-center justify-center text-white text-xs font-bold shrink-0">{{firstChar .Author}}</div>{{end}}
                                     <div class="flex-1 min-w-0">
                                         <div class="flex items-center gap-2 mb-1">
@@ -400,18 +311,40 @@
                                             <span class="text-[11px] text-gray-400">{{relativeTime .CreatedAt}}</span>
                                         </div>
                                         <p class="text-sm text-gray-600 leading-relaxed">{{.Content}}</p>
-                                        {{if .ImageURL}}<a href="{{.ImageURL}}" class="glightbox block mt-1"><img src="{{.ImageURL}}" alt="comment-img" class="max-h-32 rounded-lg border border-gray-200"></a>{{end}}
+                                        {{$imageURL := safeURL .ImageURL}}
+                                        {{if $imageURL}}<a href="{{$imageURL}}" class="glightbox block mt-1"><img loading="lazy" src="{{$imageURL}}" alt="comment-img" class="max-h-32 rounded-lg border border-gray-200"></a>{{end}}
+                                        <!-- 点赞 + 回复 -->
+                                        <div class="flex items-center gap-3 mt-1.5">
+                                            <button onclick="toggleCommentLike(this, {{.ID}})" class="comment-like-btn flex items-center gap-1 text-[11px] text-gray-400 hover:text-rose-500 transition" data-cid="{{.ID}}">
+                                                <i class="fa-regular fa-heart"></i>
+                                                <span class="like-count">{{if .Likes}}{{.Likes}}{{end}}</span>
+                                            </button>
+                                            <button onclick="replyToComment({{.ID}}, '{{.Author}}')" class="flex items-center gap-1 text-[11px] text-gray-400 hover:text-indigo-500 transition">
+                                                <i class="fa-regular fa-comment-dots"></i>回复
+                                            </button>
+                                        </div>
                                         <!-- 子回复 -->
                                         {{$parentID := .ID}}
                                         {{range $.PostComments}}
                                         {{if eq .ParentID $parentID}}
-                                        <div class="mt-2 ml-6 pl-3 border-l-2 border-gray-200 bg-gray-50/50 rounded-r-xl py-2 pr-3">
-                                            <div class="flex items-center gap-2">
+                                        <div class="mt-2.5 ml-5 pl-3 border-l-[3px] border-indigo-200/50 bg-gradient-to-r from-indigo-50/20 to-transparent rounded-r-lg py-2 pr-3">
+                                            <div class="flex items-center gap-1.5">
+                                                <span class="w-5 h-5 rounded-full bg-indigo-100 flex items-center justify-center text-[9px] font-bold text-indigo-500 shrink-0">{{firstChar .Author}}</span>
                                                 <span class="text-xs font-semibold text-gray-700">{{.Author}}</span>
                                                 <span class="text-[10px] text-gray-400">{{relativeTime .CreatedAt}}</span>
                                             </div>
-                                            <p class="text-xs text-gray-500 mt-0.5">{{if .ReplyTo}}<span class="text-indigo-400">↩ @{{.ReplyTo}}</span> {{end}}{{.Content}}</p>
-                                            {{if .ImageURL}}<a href="{{.ImageURL}}" class="glightbox block mt-1"><img src="{{.ImageURL}}" alt="comment-img" class="max-h-24 rounded-lg border border-gray-200"></a>{{end}}
+                                            <p class="text-xs text-gray-600 mt-1 pl-[26px]">{{if .ReplyTo}}<span class="text-indigo-400 font-medium">回复 {{.ReplyTo}}</span> {{end}}{{.Content}}</p>
+                                            {{$replyImageURL := safeURL .ImageURL}}
+                                            {{if $replyImageURL}}<a href="{{$replyImageURL}}" class="glightbox block mt-1"><img loading="lazy" src="{{$replyImageURL}}" alt="comment-img" class="max-h-24 rounded-lg border border-gray-200"></a>{{end}}
+                                            <div class="flex items-center gap-3 mt-1">
+                                                <button onclick="toggleCommentLike(this, {{.ID}})" class="comment-like-btn flex items-center gap-1 text-[10px] text-gray-400 hover:text-rose-500 transition" data-cid="{{.ID}}">
+                                                    <i class="fa-regular fa-heart"></i>
+                                                    <span class="like-count">{{if .Likes}}{{.Likes}}{{end}}</span>
+                                                </button>
+                                                <button onclick="replyToComment({{.ID}}, '{{.Author}}', {{$parentID}})" class="flex items-center gap-1 text-[10px] text-gray-400 hover:text-indigo-500 transition">
+                                                    <i class="fa-regular fa-comment-dots"></i>回复
+                                                </button>
+                                            </div>
                                         </div>
                                         {{end}}
                                         {{end}}
@@ -422,7 +355,7 @@
                             </div>
                             {{else}}
                             <div class="text-center text-gray-400 py-10 rounded-2xl border border-dashed border-gray-200">
-                                <span class="iconify text-4xl text-gray-300 mb-3 block mx-auto" data-icon="mdi:comment-text-outline" data-width="40"></span>
+                                <i class="fa-regular fa-comment-dots text-3xl text-gray-300 mb-3 block"></i>
                                 <p class="text-sm">暂无评论，来抢沙发吧</p>
                             </div>
                             {{end}}
@@ -435,8 +368,16 @@
                                 <form id="commentForm" onsubmit="submitComment(event)">
                                     <input type="hidden" name="target_type" value="post">
                                     <input type="hidden" name="target_id" value="{{.Post.ID}}">
+                                    <input type="hidden" name="parent_id" id="commentParentID" value="0">
+                                    <input type="hidden" name="reply_to" id="commentReplyTo" value="">
+                                    <!-- 回复提示 -->
+                                    <div id="replyIndicator" class="hidden mb-3 flex items-center gap-2 px-3 py-2 bg-indigo-50 border border-indigo-100 rounded-xl text-xs">
+                                        <i class="fa-solid fa-reply text-indigo-400 text-[10px]"></i>
+                                        <span id="replyIndicatorText" class="text-indigo-600 font-medium"></span>
+                                        <button type="button" onclick="cancelReply()" class="ml-auto w-5 h-5 rounded-full bg-indigo-100 hover:bg-indigo-200 text-indigo-500 flex items-center justify-center text-xs transition">&times;</button>
+                                    </div>
                                     <div id="comment-author-row" class="mb-3 hidden">
-                                        <input type="text" id="commentAuthor" name="author" placeholder="你的昵称" maxlength="30"
+                                        <input type="text" id="commentAuthor" name="author" placeholder="昵称（限制3-10字）" minlength="3" maxlength="10"
                                             class="input-glow w-full px-3 py-2 text-sm border border-gray-200 rounded-xl focus:outline-none bg-gray-50 placeholder-gray-400">
                                     </div>
                                     <div class="relative">
@@ -455,7 +396,7 @@
                                     </div>
                                     <!-- 图片预览 -->
                                     <div id="commentImagePreview" style="display:none" class="mt-2 relative inline-block">
-                                        <img id="commentImagePreviewImg" src="" class="max-h-24 rounded-lg border border-gray-200">
+                                        <img loading="lazy" id="commentImagePreviewImg" src="" class="max-h-24 rounded-lg border border-gray-200">
                                         <button type="button" onclick="clearCommentImage()" class="absolute -top-1.5 -right-1.5 w-5 h-5 bg-gray-700 text-white rounded-full text-xs flex items-center justify-center hover:bg-red-500 transition">&times;</button>
                                     </div>
                                     <!-- Emoji Picker Panel -->
@@ -503,87 +444,7 @@
                 
             </main>
 
-            <!-- ==================== 右侧栏 ==================== -->
-            <aside class="tri-scroll-column col-span-1 lg:col-span-1 space-y-4 hidden lg:block sticky top-6">
-                <!-- 关于我 -->
-                <div class="bg-white rounded-2xl p-4 shadow-xs border border-gray-100/50 text-center space-y-2.5">
-                    <div class="text-xs font-bold text-gray-400 text-left tracking-wider">关于我</div>
-                    <a href="/admin" class="block relative w-16 h-16 mx-auto group">
-                        <img class="w-full h-full rounded-full border-2 border-white shadow-md group-hover:ring-2 group-hover:ring-indigo-300 transition" src="{{if .AboutMe.Avatar}}{{.AboutMe.Avatar}}{{else}}https://api.dicebear.com/7.x/adventurer/svg?seed={{defaultName .AboutMe.Name}}{{end}}" alt="avatar">
-                        <span class="absolute bottom-1 right-1 w-3.5 h-3.5 bg-green-500 border-2 border-white rounded-full"></span>
-                    </a>
-                    <div class="space-y-0.5">
-                        <h4 class="font-bold text-sm">{{defaultName .AboutMe.Name}}</h4>
-                        <p class="text-[11px] text-gray-400 leading-snug">{{.AboutMe.Bio}}</p>
-                    </div>
-                    {{if .AboutMe.SocialLinks}}
-                    <div class="flex flex-wrap justify-center gap-2 text-xs text-gray-400 pt-0.5">
-                        {{range .AboutMe.SocialLinks}}
-                        <a href="{{.URL}}" target="_blank" class="hover:text-indigo-600 transition" title="{{.Name}}"><i class="{{.Icon}}"></i></a>
-                        {{end}}
-                    </div>
-                    {{end}}
-                </div>
-
-                <!-- 热门文章 -->
-                {{if .HotPosts}}
-                <div class="bg-white rounded-2xl p-4 shadow-xs border border-gray-100/50 space-y-3">
-                    <div class="text-xs font-bold text-gray-400 tracking-wider">热门文章</div>
-                    <ul class="space-y-2.5">
-                        {{range $i, $p := .HotPosts}}
-                        <li class="flex items-start space-x-3 group cursor-pointer">
-                            {{if eq $i 0}}
-                            <span class="w-5 h-5 rounded-md bg-amber-500 text-white font-bold text-[11px] flex items-center justify-center shrink-0 mt-0.5">{{add $i 1}}</span>
-                            {{else if eq $i 1}}
-                            <span class="w-5 h-5 rounded-md bg-slate-400 text-white font-bold text-[11px] flex items-center justify-center shrink-0 mt-0.5">{{add $i 1}}</span>
-                            {{else}}
-                            <span class="w-5 h-5 rounded-md bg-amber-700/50 text-white font-bold text-[11px] flex items-center justify-center shrink-0 mt-0.5">{{add $i 1}}</span>
-                            {{end}}
-                            <a href="/post/{{$p.ID}}" class="space-y-0.5 flex-1 min-w-0">
-                                <p class="text-xs font-semibold text-gray-700 group-hover:text-indigo-600 line-clamp-1 transition">{{$p.Title}}</p>
-                                <p class="text-[10px] text-gray-400">{{$p.Views}} 浏览</p>
-                            </a>
-                        </li>
-                        {{end}}
-                    </ul>
-                </div>
-                {{end}}
-
-                <!-- 最新评论 -->
-                {{if .RecentComments}}
-                <div class="bg-white rounded-2xl p-4 shadow-xs border border-gray-100/50 space-y-3">
-                    <div class="text-xs font-bold text-gray-400 tracking-wider">最新评论</div>
-                    <div class="space-y-2 text-xs">
-                        {{range .RecentComments}}
-                        <div class="bg-gray-50/80 p-2.5 rounded-xl space-y-1 border border-gray-100/70 hover:bg-indigo-50/50 transition">
-                            <div class="flex justify-between items-center gap-2">
-                                <div class="flex items-center gap-1.5">
-                                    {{if .AuthorAvatar}}<img src="{{.AuthorAvatar}}" class="w-4 h-4 rounded-full object-cover">
-                                    {{else}}<div class="w-4 h-4 rounded-full bg-gradient-to-br from-indigo-400 to-purple-500 flex items-center justify-center text-white text-[8px] font-bold">{{firstChar .Author}}</div>{{end}}
-                                    <span class="font-bold text-gray-700 truncate">{{.Author}}</span>
-                                </div>
-                                <span class="text-[9px] text-gray-400 shrink-0">{{.CreatedAt.Format "01-02"}}</span>
-                            </div>
-                            <p class="text-gray-600 leading-snug line-clamp-2">{{.Content}}</p>
-                            {{if .ImageURL}}<a href="{{.ImageURL}}" class="glightbox block mt-1"><img src="{{.ImageURL}}" alt="comment-img" class="w-14 h-14 rounded-lg object-cover"></a>{{end}}
-                        </div>
-                        {{end}}
-                    </div>
-                </div>
-                {{end}}
-
-                <!-- 标签云 -->
-                {{if .Tags}}
-                <div class="bg-white rounded-2xl p-4 shadow-xs border border-gray-100/50 space-y-3">
-                    <div class="text-xs font-bold text-gray-400 tracking-wider">标签云</div>
-                    <div class="flex flex-wrap gap-1.5">
-                        {{range .Tags}}
-                        <a href="/?tag={{.Name}}" class="bg-gray-50 hover:bg-indigo-50 text-gray-500 hover:text-indigo-600 text-[11px] px-2.5 py-1 rounded-lg transition font-medium">{{.Name}} <span class="text-[9px] text-gray-300">{{.PostCount}}</span></a>
-                        {{end}}
-                    </div>
-                </div>
-                {{end}}
-            </aside>
+            {{template "partials/rightbar" .}}
         </div>
     </div>
 
@@ -592,21 +453,115 @@
         // 图片灯箱
         const lightbox = GLightbox({ selector: '.glightbox', touchNavigation: true, loop: true });
 
+        // 页面加载时立即读取昵称 cookie（不等异步 auth 回调）
+        (function() {
+            var nick = getCookie('_nick');
+            if (nick) {
+                var authorInput = document.getElementById('commentAuthor');
+                if (authorInput) authorInput.value = nick;
+            }
+        })();
+
         async function submitComment(e) {
             e.preventDefault();
             var form = e.target;
             var btn = document.getElementById('commentSubmitBtn');
+            var authorInput = document.getElementById('commentAuthor');
+            if (authorInput && !authorInput.closest('.hidden')) {
+                var authorLen = [...authorInput.value.trim()].length;
+                if (authorLen < 3 || authorLen > 10) {
+                    showToast('昵称需要 3-10 个字', 'error');
+                    return;
+                }
+            }
             var fd = new FormData(form);
             btn.disabled = true;
             btn.innerHTML = '<span class="spinner"></span>提交中';
             try {
                 var res = await fetch('/api/comment', { method: 'POST', body: fd });
                 var data = await res.json();
-                if (data.ok) { form.reset(); showToast('评论已发布', 'success'); setTimeout(function(){location.reload();},1200); }
+                if (data.ok) {
+                    // 记住昵称
+                    var authorInput = document.getElementById('commentAuthor');
+                    if (authorInput && !authorInput.closest('.hidden') && authorInput.value.trim()) {
+                        setCookie('_nick', authorInput.value.trim(), 365);
+                    }
+                    form.reset();
+                    cancelReply();
+                    // 恢复昵称到输入框
+                    var nick = getCookie('_nick');
+                    if (nick && authorInput && !authorInput.closest('.hidden')) authorInput.value = nick;
+                    insertNewComment(data);
+                    showToast('评论已发布', 'success');
+                }
                 else { showToast(data.msg || '提交失败', 'error'); }
             } catch(err) { showToast('网络错误', 'error'); }
             btn.disabled = false;
             btn.innerHTML = '提交评论';
+        }
+
+        // 动态插入新评论
+        function insertNewComment(data) {
+            var list = document.querySelector('.comment-scroll-box');
+            var emptyHint = document.querySelector('#comments .text-center');
+            var isReply = data.parent_id && data.parent_id != '0';
+            
+            // 隐藏空态
+            if (emptyHint) emptyHint.remove();
+            
+            // 如果列表不存在（首次评论），创建它
+            if (!list && !isReply) {
+                list = document.createElement('div');
+                list.className = 'comment-scroll-box space-y-3 max-h-[26rem] overflow-y-auto pr-1 mb-6';
+                var h2 = document.querySelector('#comments h2');
+                h2.insertAdjacentElement('afterend', list);
+            }
+            
+            var avatarHtml = data.author_avatar
+                ? '<img loading="lazy" src="' + escapeHtml(data.author_avatar) + '" class="w-9 h-9 rounded-full object-cover ring-1 ring-gray-100 shrink-0">'
+                : '<div class="w-9 h-9 rounded-full bg-gradient-to-br from-indigo-400 to-purple-500 ring-1 ring-indigo-200 flex items-center justify-center text-white text-xs font-bold shrink-0">' + (data.author ? data.author[0] : '?') + '</div>';
+            var imgHtml = data.image_url ? '<a href="' + escapeHtml(data.image_url) + '" class="glightbox block mt-1"><img loading="lazy" src="' + escapeHtml(data.image_url) + '" class="max-h-32 rounded-lg border border-gray-200"></a>' : '';
+            var replyToHtml = data.reply_to ? '<span class="text-indigo-400 font-medium">回复 ' + escapeHtml(data.reply_to) + '</span> ' : '';
+            
+            var el = document.createElement('div');
+            if (isReply) {
+                el.className = 'mt-2.5 ml-5 pl-3 border-l-[3px] border-indigo-200/50 bg-gradient-to-r from-indigo-50/20 to-transparent rounded-r-lg py-2 pr-3';
+                var avatarChar = data.author ? data.author[0] : '?';
+                el.innerHTML = '<div class="flex items-center gap-1.5"><span class="w-5 h-5 rounded-full bg-indigo-100 flex items-center justify-center text-[9px] font-bold text-indigo-500 shrink-0">' + escapeHtml(avatarChar) + '</span><span class="text-xs font-semibold text-gray-700">' + escapeHtml(data.author) + '</span><span class="text-[10px] text-gray-400">刚刚</span></div><p class="text-xs text-gray-600 mt-1 pl-[26px]">' + replyToHtml + escapeHtml(data.content) + '</p>' + imgHtml + '<div class="flex items-center gap-3 mt-1 pl-[26px]"><button onclick="toggleCommentLike(this, ' + data.id + ')" class="comment-like-btn flex items-center gap-1 text-[10px] text-gray-400 hover:text-rose-500 transition" data-cid="' + data.id + '"><i class="fa-regular fa-heart"></i><span class="like-count"></span></button><button onclick="replyToComment(' + data.id + ', \'' + escapeHtml(data.author) + '\')" class="flex items-center gap-1 text-[10px] text-gray-400 hover:text-indigo-500 transition"><i class="fa-regular fa-comment-dots"></i>回复</button></div>';
+                // 找到父评论容器：先定位被回复评论的点赞按钮，再找它的容器
+                var parentBtn = document.querySelector('.comment-like-btn[data-cid="' + data.parent_id + '"]');
+                if (parentBtn) {
+                    // 回复子回复：向上找到带左边框的容器，新回复作为同级插入其后
+                    var container = parentBtn.closest('[class*="border-l-"]');
+                    if (container) {
+                        container.insertAdjacentElement('afterend', el);
+                    } else {
+                        // 回复顶级评论：跳过按钮行，找到评论卡片容器
+                        var pc = parentBtn.parentElement; // 按钮行 div
+                        while (pc && !pc.classList.contains('flex-1')) { pc = pc.parentElement; }
+                        pc = pc ? pc.parentElement : null; // 评论卡片
+                        if (pc && pc.querySelector('.flex-1')) { pc.querySelector('.flex-1').appendChild(el); }
+                    }
+                }
+                if (!parentBtn) {
+                    // 回退：找不到父容器时插入列表顶部
+                    if (list) list.insertBefore(el, list.firstChild);
+                }
+            } else {
+                el.className = 'flex gap-3 p-3 bg-white rounded-xl hover:bg-gray-50 transition-colors';
+                el.innerHTML = avatarHtml + '<div class="flex-1 min-w-0"><div class="flex items-center gap-2 mb-1"><span class="text-sm font-semibold text-gray-800">' + escapeHtml(data.author) + '</span><span class="text-[11px] text-gray-400">刚刚</span></div><p class="text-sm text-gray-600 leading-relaxed">' + escapeHtml(data.content) + '</p>' + imgHtml + '<div class="flex items-center gap-3 mt-1.5"><button onclick="toggleCommentLike(this, ' + data.id + ')" class="comment-like-btn flex items-center gap-1 text-[11px] text-gray-400 hover:text-rose-500 transition" data-cid="' + data.id + '"><i class="fa-regular fa-heart"></i><span class="like-count"></span></button><button onclick="replyToComment(' + data.id + ', \'' + escapeHtml(data.author) + '\')" class="flex items-center gap-1 text-[11px] text-gray-400 hover:text-indigo-500 transition"><i class="fa-regular fa-comment-dots"></i>回复</button></div></div>';
+                // 插入到列表顶部（最新在前）
+                if (list) list.insertBefore(el, list.firstChild);
+            }
+            
+            // 重新初始化 lightbox
+            GLightbox({ selector: '.glightbox', touchNavigation: true, loop: true });
+        }
+
+        function escapeHtml(s) {
+            var d = document.createElement('div');
+            d.textContent = s;
+            return d.innerHTML;
         }
 
         // Toast 通知
@@ -650,53 +605,6 @@
             ta.selectionStart = ta.selectionEnd = start + emoji.length;
             ta.focus();
         }
-
-        // 侧边栏
-        function toggleSidebar() {
-            var sb = document.getElementById('sidebar');
-            var ov = document.getElementById('sidebar-overlay');
-            if (!sb || !ov) return;
-            var isOpen = !sb.classList.contains('-translate-x-full');
-            if (isOpen) {
-                sb.classList.add('-translate-x-full');
-                ov.classList.add('invisible','opacity-0');
-                ov.classList.remove('opacity-100');
-            } else {
-                sb.classList.remove('-translate-x-full');
-                ov.classList.remove('invisible','opacity-0');
-                ov.classList.add('opacity-100');
-            }
-        }
-        document.getElementById('sidebar-overlay') && document.getElementById('sidebar-overlay').addEventListener('click', toggleSidebar);
-        document.getElementById('close-sidebar') && document.getElementById('close-sidebar').addEventListener('click', toggleSidebar);
-        document.getElementById('open-sidebar') && document.getElementById('open-sidebar').addEventListener('click', toggleSidebar);
-
-        // 通知弹窗
-        function toggleNotification() {
-            var panel = document.getElementById('notification-panel');
-            if (!panel) return;
-            if (panel.style.display === 'block') {
-                panel.style.opacity = '0'; panel.style.transform = 'translateX(20px)';
-                setTimeout(function() { panel.style.display = 'none'; }, 300);
-            } else {
-                panel.style.display = 'block';
-                setTimeout(function() { panel.style.opacity = '1'; panel.style.transform = 'translateX(0)'; }, 10);
-                document.querySelectorAll('.notify-dot').forEach(function(d){ d.classList.add('hidden'); });
-                localStorage.setItem('notify-seen', '1');
-            }
-        }
-        if (localStorage.getItem('notify-seen') === '1') {
-            document.querySelectorAll('.notify-dot').forEach(function(d){ d.classList.add('hidden'); });
-        }
-        document.addEventListener('click', function(e) {
-            var panel = document.getElementById('notification-panel');
-            if (!panel) return;
-            var bell = e.target.closest('[onclick*="toggleNotification"]');
-            if (!bell && !panel.contains(e.target) && panel.style.opacity === '1') {
-                panel.style.opacity = '0'; panel.style.transform = 'translateX(20px)';
-                setTimeout(function() { panel.style.display = 'none'; }, 300);
-            }
-        });
 
         // 三栏同步滚轮：到边界的栏停止，未到边界的栏继续
         (function() {
@@ -781,27 +689,54 @@
                     if (imgBtn) imgBtn.classList.remove('hidden');
                 } else {
                     authorRow.classList.remove('hidden');
+                    // 自动填充上次使用的昵称
+                    var nick = getCookie('_nick');
+                    if (nick) document.getElementById('commentAuthor').value = nick;
                 }
             }).catch(() => {});
         })();
 
         // 点赞
         function votePost(type, postId) {
-            var key = 'post-vote-' + postId;
-            if (localStorage.getItem(key)) { return; }
-            localStorage.setItem(key, '1');
             var btn = document.getElementById('btn-like');
-            if (btn) btn.classList.add('btn-voted');
-            fetch('/api/post/like/' + postId, { method: 'POST' })
-                .then(function(r) { return r.json(); })
-                .then(function(d) {
-                    if (d.ok) {
-                        var el = document.getElementById('like-count');
-                        if (el) el.textContent = d.count;
-                        showToast('已点赞 👍', 'success');
-                    }
-                });
+            var isVoted = btn && btn.classList.contains('btn-voted');
+            if (isVoted) {
+                // 已点赞 -> 取消
+                fetch('/api/post/like/' + postId, { method: 'POST' })
+                    .then(function(r) { return r.json(); })
+                    .then(function(d) {
+                        if (d.ok) {
+                            var el = document.getElementById('like-count');
+                            if (el) el.textContent = d.count;
+                            if (btn) { btn.classList.remove('btn-voted'); btn.title = '点赞'; }
+                            localStorage.removeItem('post-vote-' + postId);
+                            showToast('已取消点赞', 'info');
+                        }
+                    });
+            } else {
+                // 未点赞 -> 点赞
+                setLikeActive();
+                fetch('/api/post/like/' + postId, { method: 'POST' })
+                    .then(function(r) { return r.json(); })
+                    .then(function(d) {
+                        if (d.ok) {
+                            var el = document.getElementById('like-count');
+                            if (el) el.textContent = d.count;
+                            localStorage.setItem('post-vote-' + postId, '1');
+                            showToast('已点赞 👍', 'success');
+                        }
+                    });
+            }
         }
+
+        function setLikeActive() {
+            var btn = document.getElementById('btn-like');
+            if (btn) { btn.classList.add('btn-voted'); btn.title = '已点赞'; }
+        }
+        // 页面加载时恢复点赞状态
+        (function() {
+            if (localStorage.getItem('post-vote-{{.Post.ID}}')) setLikeActive();
+        })();
 
         // 阅读进度条
         (function() {
@@ -811,25 +746,6 @@
                 var total = h.scrollHeight - h.clientHeight;
                 var pct = total > 0 ? Math.min(100, Math.round(h.scrollTop / total * 100)) : 0;
                 bar.style.width = pct + '%';
-            }, { passive: true });
-        })();
-
-        // 回到顶部
-        (function() {
-            var btn = document.createElement('div');
-            btn.id = 'back-to-top';
-            btn.innerHTML = '<span class="iconify" data-icon="mdi:chevron-up" data-width="20"></span>';
-            document.body.appendChild(btn);
-            btn.addEventListener('click', function() { window.scrollTo({ top: 0, behavior: 'smooth' }); });
-            var ticking = false;
-            window.addEventListener('scroll', function() {
-                if (!ticking) {
-                    requestAnimationFrame(function() {
-                        btn.classList.toggle('show', window.scrollY > window.innerHeight);
-                        ticking = false;
-                    });
-                    ticking = true;
-                }
             }, { passive: true });
         })();
 
@@ -855,45 +771,44 @@
         var ___shareSite = {{json .SiteTitle}};
         var ___shareUrl = location.href;
 
+        var __coverLoaded = false;
+        var __coverImg = null;
+
         function drawCard() {
             var canvas = document.getElementById('share-card-canvas');
-            if (!canvas) { console.error('Canvas not found'); return; }
+            if (!canvas) return;
             var W = 600, H = 336;
             canvas.width = W; canvas.height = H;
             var ctx = canvas.getContext('2d');
-            if (!ctx) { console.error('Canvas context null'); return; }
-            
-            // 1. 白色背景打底
+            if (!ctx) return;
+
+            // 白色背景
             ctx.fillStyle = '#ffffff';
             ctx.fillRect(0, 0, W, H);
-            
+
             var cx = 24, cy = 24, cw = 260, ch = 260;
-            
-            // 2. 立即画左侧封面区（fallback渐变）
-            ctx.save();
-            roundRectPath(ctx, cx, cy, cw, ch, 12);
-            ctx.clip();
-            var grad = ctx.createLinearGradient(cx, cy, cx + cw, cy + ch);
-            grad.addColorStop(0, '#6366f1');
-            grad.addColorStop(1, '#8b5cf6');
-            ctx.fillStyle = grad;
-            ctx.fillRect(cx, cy, cw, ch);
-            ctx.fillStyle = 'rgba(255,255,255,0.25)';
-            ctx.font = 'bold 80px sans-serif';
-            ctx.textAlign = 'center';
-            ctx.textBaseline = 'middle';
-            ctx.fillText((___shareSite || 'U')[0], cx + cw/2, cy + ch/2);
-            ctx.restore();
-            
-            // 3. 立即画右侧文字（不等待图片）
+
+            // 左侧封面：已加载则画图，否则画渐变占位
+            if (__coverLoaded && __coverImg) {
+                ctx.save(); roundRectPath(ctx, cx, cy, cw, ch, 12); ctx.clip();
+                var s = Math.max(cw / __coverImg.width, ch / __coverImg.height);
+                var sw = cw / s, sh = ch / s;
+                ctx.fillStyle = '#ffffff'; ctx.fillRect(cx, cy, cw, ch);
+                ctx.drawImage(__coverImg, (__coverImg.width - sw) / 2, (__coverImg.height - sh) / 2, sw, sh, cx, cy, cw, ch);
+                ctx.restore();
+            } else {
+                drawFallback(ctx, cx, cy, cw, ch);
+            }
+
+            // 右侧文字
             var tx = 308, ty = 40, mw = W - tx - 24;
             ctx.fillStyle = '#1f2937'; ctx.font = 'bold 22px sans-serif';
             ty = wrapLines(ctx, ___shareTitle || '无标题', tx, ty, mw, 30, 2);
             ty += 16;
             ctx.fillStyle = '#6b7280'; ctx.font = '14px sans-serif';
             wrapLines(ctx, ___shareSummary || '', tx, ty, mw, 22, 3);
-            
-            // 4. 底部站点信息
+
+            // 底部站点信息
             var by = H - 14;
             ctx.strokeStyle = '#f3f4f6'; ctx.lineWidth = 1;
             ctx.beginPath(); ctx.moveTo(24, by); ctx.lineTo(W - 24, by); ctx.stroke();
@@ -901,26 +816,18 @@
             ctx.fillText((___shareSite || 'UniFlow'), tx, by + 18);
             ctx.fillStyle = '#d1d5db'; ctx.font = '10px sans-serif';
             ctx.fillText(location.host, tx, by + 34);
-            
-            // 5. 异步加载封面图（成功后覆盖左侧）
-            if (___shareCover) {
-                var img = new Image();
-                img.onload = function() {
-                    if (!canvas.getContext) return;
-                    var ctx2 = canvas.getContext('2d');
-                    ctx2.save();
-                    roundRectPath(ctx2, cx, cy, cw, ch, 12);
-                    ctx2.clip();
-                    ctx2.fillStyle = '#ffffff';
-                    ctx2.fillRect(cx, cy, cw, ch);
-                    var s = Math.max(cw / img.width, ch / img.height);
-                    var sw = cw / s, sh = ch / s;
-                    ctx2.drawImage(img, (img.width - sw) / 2, (img.height - sh) / 2, sw, sh, cx, cy, cw, ch);
-                    ctx2.restore();
-                };
-                img.onerror = function() { /* 保持fallback */ };
-                img.src = ___shareCover;
-            }
+        }
+
+        // 预加载封面图
+        function preloadCover() {
+            if (!___shareCover) return;
+            __coverImg = new Image();
+            __coverImg.onload = function() {
+                __coverLoaded = true;
+                drawCard();
+            };
+            __coverImg.onerror = function() { __coverLoaded = false; };
+            __coverImg.src = ___shareCover;
         }
 
         function drawFallback(ctx, x, y, w, h) {
@@ -964,6 +871,7 @@
             if (hidden) {
                 p.classList.remove('opacity-0','invisible','translate-y-2');
                 p.classList.add('opacity-100','translate-y-0');
+                preloadCover();
                 setTimeout(function() { drawCard(); }, 80);
             } else {
                 p.classList.add('opacity-0','invisible','translate-y-2');
@@ -1027,34 +935,80 @@
         }
 
 
-        // 建站计时器
+        // 评论区独立滚动——鼠标悬停时只滚动评论，不穿透到父容器
         (function() {
-            var el = document.getElementById('site-uptime');
-            if (!el) return;
-            var founded = el.getAttribute('data-founded');
-            if (!founded) { el.style.display = 'none'; return; }
-            var foundedDate = new Date(founded);
-            if (isNaN(foundedDate.getTime())) { el.style.display = 'none'; return; }
-            function update() {
-                var diff = Date.now() - foundedDate.getTime();
-                if (diff < 0) diff = 0;
-                var d = Math.floor(diff / 86400000);
-                var h = Math.floor((diff % 86400000) / 3600000);
-                var m = Math.floor((diff % 3600000) / 60000);
-                var s = Math.floor((diff % 60000) / 1000);
-                var dEl = document.getElementById('site-uptime-d');
-                var hEl = document.getElementById('site-uptime-h');
-                var mEl = document.getElementById('site-uptime-m');
-                var sEl = document.getElementById('site-uptime-s');
-                if (dEl) dEl.textContent = d;
-                if (hEl) hEl.textContent = String(h).padStart(2,'0');
-                if (mEl) mEl.textContent = String(m).padStart(2,'0');
-                if (sEl) sEl.textContent = String(s).padStart(2,'0');
+            var box = document.querySelector('.comment-scroll-box');
+            var main = document.querySelector('main.tri-scroll-column');
+            if (!box) return;
+            
+            var insideBox = false;
+            box.addEventListener('mouseenter', function() { insideBox = true; });
+            box.addEventListener('mouseleave', function() { insideBox = false; });
+            
+            // 在 main 层统一接管：鼠标在评论框内 → 只滚评论；否则 → 正常滚 main
+            if (main) {
+                main.addEventListener('wheel', function(e) {
+                    if (!insideBox) return;
+                    e.preventDefault();
+                    e.stopPropagation();
+                    box.scrollTop += e.deltaY;
+                }, { passive: false });
             }
-            update();
-            setInterval(update, 1000);
         })();
+        
+        // 评论点赞
+        async function toggleCommentLike(btn, cid) {
+            var resp = await fetch('/api/comment/like', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({comment_id: cid})
+            });
+            var data = await resp.json();
+            if (!data.ok) return;
+            var icon = btn.querySelector('i');
+            var countEl = btn.querySelector('.like-count');
+            if (data.liked) {
+                icon.className = 'fa-solid fa-heart text-rose-500';
+                btn.classList.add('text-rose-500');
+            } else {
+                icon.className = 'fa-regular fa-heart';
+                btn.classList.remove('text-rose-500');
+            }
+            countEl.textContent = data.likes > 0 ? data.likes : '';
+        }
+        
+        // 回复评论
+        function replyToComment(cid, author, actualParentId) {
+            // 子回复：使用上级评论ID作为parent_id，保持同级
+            document.getElementById('commentParentID').value = actualParentId || cid;
+            document.getElementById('commentReplyTo').value = author;
+            var ind = document.getElementById('replyIndicator');
+            var text = document.getElementById('replyIndicatorText');
+            text.textContent = '回复 ' + author;
+            ind.classList.remove('hidden');
+            document.getElementById('commentContent').focus();
+            document.getElementById('commentContent').placeholder = '回复 ' + author + '...';
+        }
+        
+        function cancelReply() {
+            document.getElementById('commentParentID').value = '0';
+            document.getElementById('commentReplyTo').value = '';
+            document.getElementById('replyIndicator').classList.add('hidden');
+            document.getElementById('commentContent').placeholder = '说点什么吧，支持表情哦~';
+        }
+
+        // cookie 工具函数
+        function getCookie(name) {
+            var m = document.cookie.match('(^|;)\\s*' + name + '\\s*=\\s*([^;]+)');
+            return m ? decodeURIComponent(m[2]) : '';
+        }
+        function setCookie(name, value, days) {
+            var d = new Date();
+            d.setTime(d.getTime() + days * 86400000);
+            document.cookie = name + '=' + encodeURIComponent(value) + ';path=/;expires=' + d.toUTCString();
+        }
 
     </script>
+{{template "partials/footer-scripts" .}}
 </body>
 </html>

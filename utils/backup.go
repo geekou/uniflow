@@ -122,6 +122,11 @@ func CreateBackup(cfg *BackupConfig) (string, error) {
 // RestoreBackup 从备份文件恢复
 // 解压并覆盖当前的 uniflow.db 和 uploads/ 目录
 func RestoreBackup(cfg *BackupConfig, backupFilePath string) error {
+	// 单个文件解压大小上限：2GB，防止 zip bomb 耗尽磁盘
+	const maxFileSize int64 = 2 << 30
+	// 总解压大小上限：10GB
+	const maxTotalSize int64 = 10 << 30
+
 	// 验证备份文件存在
 	if _, err := os.Stat(backupFilePath); err != nil {
 		return fmt.Errorf("backup file not found: %s", backupFilePath)
@@ -148,6 +153,7 @@ func RestoreBackup(cfg *BackupConfig, backupFilePath string) error {
 	tr := tar.NewReader(gzr)
 
 	restoredFiles := 0
+	var totalSize int64
 
 	for {
 		header, err := tr.Next()
@@ -158,10 +164,26 @@ func RestoreBackup(cfg *BackupConfig, backupFilePath string) error {
 			return fmt.Errorf("failed to read tar entry: %w", err)
 		}
 
+		// 单个文件大小限制
+		if header.Size > maxFileSize {
+			return fmt.Errorf("security: file too large in backup: %s (%d bytes)", header.Name, header.Size)
+		}
+
 		// 安全检查：防止路径穿越
 		targetPath := filepath.Join(cfg.ProjectRoot, header.Name)
 		if !strings.HasPrefix(filepath.Clean(targetPath), filepath.Clean(cfg.ProjectRoot)+string(os.PathSeparator)) {
 			return fmt.Errorf("security: path traversal detected in backup: %s", header.Name)
+		}
+
+		// 白名单检查：只允许恢复 uniflow.db* 和 uploads/ 下的文件
+		// 防止恶意备份包覆盖可执行文件或其他系统文件
+		cleanName := filepath.ToSlash(filepath.Clean(header.Name))
+		isAllowed := strings.HasPrefix(cleanName, "uploads/") ||
+			strings.HasPrefix(cleanName, "uniflow.db") ||
+			cleanName == "uploads"
+		if !isAllowed {
+			log.Printf("[Restore] skipping disallowed file: %s", header.Name)
+			continue
 		}
 
 		switch header.Typeflag {
@@ -183,11 +205,19 @@ func RestoreBackup(cfg *BackupConfig, backupFilePath string) error {
 				return fmt.Errorf("failed to create file %s: %w", targetPath, err)
 			}
 
-			if _, err := io.Copy(outFile, tr); err != nil {
-				outFile.Close()
+			// 用 LimitReader 限制实际写入大小（防止 header.Size 被伪造）
+			written, err := io.Copy(outFile, io.LimitReader(tr, maxFileSize+1))
+			outFile.Close()
+			if err != nil {
 				return fmt.Errorf("failed to write file %s: %w", targetPath, err)
 			}
-			outFile.Close()
+			if written > maxFileSize {
+				return fmt.Errorf("security: file too large during extraction: %s", header.Name)
+			}
+			totalSize += written
+			if totalSize > maxTotalSize {
+				return fmt.Errorf("security: total extraction size exceeded limit")
+			}
 			restoredFiles++
 		}
 	}

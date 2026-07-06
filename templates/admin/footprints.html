@@ -1,0 +1,84 @@
+{{template "admin_head" .}}
+    <div class="flex items-center justify-between mb-6">
+        <h2 class="text-lg font-bold">足迹管理</h2>
+    </div>
+
+    <div class="bg-white rounded-2xl p-6 shadow-xs border border-gray-100/50 space-y-6">
+        <!-- 添加/编辑 -->
+        <form id="fp-form" class="space-y-3">
+            <input type="hidden" name="index" id="fp-index" value="-1">
+            <div class="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                <div>
+                    <label class="text-xs font-medium text-gray-500 mb-1 block">地名 <span class="text-red-400">*</span></label>
+                    <input type="text" name="name" id="fp-name" required placeholder="如：北京（支持省/市/区）" class="w-full border border-gray-200 rounded-xl px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-indigo-200 focus:border-indigo-400">
+                </div>
+                <div>
+                    <label class="text-xs font-medium text-gray-500 mb-1 block">备注</label>
+                    <input type="text" name="note" id="fp-note" placeholder="如：2023年旅行" class="w-full border border-gray-200 rounded-xl px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-indigo-200 focus:border-indigo-400">
+                </div>
+            </div>
+            <div class="flex items-center gap-3">
+                <button type="submit" class="bg-indigo-600 text-white text-xs px-5 py-2 rounded-xl font-medium hover:bg-indigo-700 transition">保存</button>
+                <button type="button" id="fp-cancel" class="hidden text-xs text-gray-400 hover:text-gray-600 transition" onclick="cancelEdit()">取消</button>
+            </div>
+        </form>
+
+        <!-- 列表 -->
+        <div class="pt-4 border-t border-gray-100">
+            <table class="w-full text-sm" id="fp-table">
+                <thead class="bg-gray-50/50 text-xs text-gray-400">
+                    <tr><th class="text-left px-4 py-3">#</th><th class="text-left px-4 py-3">地名</th><th class="text-left px-4 py-3">坐标</th><th class="text-left px-4 py-3">备注</th><th class="text-left px-4 py-3">操作</th></tr>
+                </thead>
+                <tbody class="divide-y divide-gray-50">
+                    {{range $i, $fp := .Footprints}}
+                    <tr class="hover:bg-gray-50/50 transition">
+                        <td class="px-4 py-3 text-xs text-gray-400">{{$i}}</td>
+                        <td class="px-4 py-3 font-medium text-gray-700">{{$fp.name}}</td>
+                        <td class="px-4 py-3 text-xs text-gray-500">{{$fp.lat}}, {{$fp.lng}}</td>
+                        <td class="px-4 py-3 text-xs text-gray-400">{{$fp.note}}</td>
+                        <td class="px-4 py-3">
+                            <div class="flex items-center space-x-2">
+                                <button onclick='editFP({{$i}}, {{$fp.name}}, {{$fp.lat}}, {{$fp.lng}}, {{$fp.note}})' class="text-xs text-indigo-500 hover:text-indigo-700"><i class="fa-solid fa-pen-to-square"></i></button>
+                                <button onclick="confirmAction('确定删除？', '/admin/footprints/delete/{{$i}}')" class="text-xs text-red-400 hover:text-red-600"><i class="fa-solid fa-trash"></i></button>
+                            </div>
+                        </td>
+                    </tr>
+                    {{end}}
+                </tbody>
+            </table>
+            {{if eq (len .Footprints) 0}}<div class="text-center py-8 text-sm text-gray-400">暂无足迹，在上方添加</div>{{end}}
+        </div>
+    </div>
+
+    <script>
+        document.getElementById('fp-form').addEventListener('submit', function(e) {
+            e.preventDefault();
+            var fd = new FormData(this);
+            fetch('/admin/footprints/save', { method: 'POST', body: new URLSearchParams(fd) })
+                .then(r => r.json())
+                .then(data => { if (data.ok) location.reload(); else alert(data.msg || '保存失败'); })
+                .catch(() => alert('网络错误'));
+        });
+
+        function editFP(index, name, lat, lng, note) {
+            document.getElementById('fp-index').value = index;
+            document.getElementById('fp-name').value = name;
+            document.getElementById('fp-lat').value = lat;
+            document.getElementById('fp-lng').value = lng;
+            document.getElementById('fp-note').value = note || '';
+            document.getElementById('fp-cancel').classList.remove('hidden');
+        }
+
+        function cancelEdit() {
+            document.getElementById('fp-form').reset();
+            document.getElementById('fp-index').value = '-1';
+            document.getElementById('fp-cancel').classList.add('hidden');
+        }
+
+        function confirmAction(msg, url) {
+            if (confirm(msg)) {
+                fetch(url, { method: 'POST' }).then(r => r.json()).then(data => { if (data.ok) location.reload(); });
+            }
+        }
+    </script>
+{{template "admin_tail" .}}
