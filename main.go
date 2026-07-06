@@ -22,7 +22,7 @@ import (
 )
 
 // Version 当前版本号
-const Version = "v1.3.1"
+const Version = "v1.6.1"
 
 // splitWords 按字母/数字连续段统计英文单词。
 func splitWords(s string) []string {
@@ -393,6 +393,7 @@ func main() {
 		auth.GET("/photos", func(c *gin.Context) { c.Redirect(http.StatusFound, "/admin/media?type=photos") })
 		auth.GET("/videos", func(c *gin.Context) { c.Redirect(http.StatusFound, "/admin/media?type=videos") })
 		auth.GET("/media", handlers.AdminMedia(db))
+		auth.GET("/media/api", handlers.AdminMediaAPI(db))
 		auth.POST("/upload", handlers.AdminUpload(db))
 		auth.POST("/media/delete/:name", handlers.AdminMediaDelete(db))
 		auth.POST("/media/batch-delete", handlers.AdminMediaBatchDelete(db))

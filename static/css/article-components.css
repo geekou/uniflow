@@ -1,0 +1,28 @@
+/* ====== UniFlow 文章组件样式 ====== */
+
+/* 提示框 */
+.callout { padding: 1rem 1.25rem; border-radius: 0.875rem; margin: 1rem 0; border-left: 4px solid; line-height: 1.7; }
+.callout-info { background: #eff6ff; border-color: #3b82f6; color: #1e3a5f; }
+.callout-warning { background: #fffbeb; border-color: #f59e0b; color: #78350f; }
+.callout-success { background: #f0fdf4; border-color: #22c55e; color: #14532d; }
+.callout-danger { background: #fef2f2; border-color: #ef4444; color: #7f1d1d; }
+.callout p { margin: 0; }
+
+/* 折叠面板 */
+
+/* 按钮（前台 JS 自动转为链接） */
+
+/* 标签 */
+.badge { display: inline-block; padding: 0.125rem 0.5625rem; border-radius: 9999px; font-size: 0.75rem; font-weight: 600; color: #fff; vertical-align: middle; line-height: 1.5; }
+.badge-blue { background: #3b82f6; }
+.badge-green { background: #22c55e; }
+.badge-red { background: #ef4444; }
+.badge-yellow { background: #eab308; color: #000; }
+.badge-purple { background: #a855f7; }
+.badge-gray { background: #6b7280; }
+
+/* 代码块复制按钮 */
+.code-block-wrapper { position: relative; }
+.code-block-wrapper .copy-btn { position: absolute; top: 0.5rem; right: 0.5rem; padding: 0.25rem 0.625rem; border: none; border-radius: 0.375rem; background: rgba(255,255,255,0.1); color: rgba(255,255,255,0.6); font-size: 0.75rem; cursor: pointer; transition: all 0.15s; }
+.code-block-wrapper .copy-btn:hover { background: rgba(255,255,255,0.2); color: #fff; }
+.code-block-wrapper .copy-btn.copied { background: rgba(34,197,94,0.3); color: #4ade80; }

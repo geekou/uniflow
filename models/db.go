@@ -181,6 +181,8 @@ func createTables() error {
 			content TEXT NOT NULL DEFAULT '',
 			media_urls TEXT DEFAULT '',
 			likes INTEGER NOT NULL DEFAULT 0,
+			status TEXT NOT NULL DEFAULT 'published',
+			publish_at DATETIME DEFAULT NULL,
 			created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
 		)`,
 		// 评论表
@@ -409,6 +411,30 @@ func createTables() error {
 		if !hasMomentUpdatedAt {
 			_, _ = DB.Exec("ALTER TABLE moments ADD COLUMN updated_at DATETIME")
 			log.Println("[DB] Migration: added updated_at column to moments table")
+		}
+	}
+
+	// moments 表 status / publish_at 迁移
+	{
+		colRows, err := DB.Query("PRAGMA table_info(moments)")
+		if err == nil {
+			hasStatus := false
+			hasPublishAt := false
+			for colRows.Next() {
+				var cid int; var cname, ctype string; var notnull int; var dfltValue interface{}; var pk int
+				colRows.Scan(&cid, &cname, &ctype, &notnull, &dfltValue, &pk)
+				if cname == "status" { hasStatus = true }
+				if cname == "publish_at" { hasPublishAt = true }
+			}
+			colRows.Close()
+			if !hasStatus {
+				DB.Exec("ALTER TABLE moments ADD COLUMN status TEXT NOT NULL DEFAULT 'published'")
+				log.Println("[DB] Migration: added status column to moments table")
+			}
+			if !hasPublishAt {
+				DB.Exec("ALTER TABLE moments ADD COLUMN publish_at DATETIME DEFAULT NULL")
+				log.Println("[DB] Migration: added publish_at column to moments table")
+			}
 		}
 	}
 

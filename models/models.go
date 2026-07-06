@@ -29,11 +29,13 @@ type Post struct {
 
 // Moment 瞬间模型
 type Moment struct {
-	ID        int64     `json:"id"`
-	Content   string    `json:"content"`
-	MediaURLs string    `json:"media_urls"` // 逗号分隔的图片/视频URL
-	Likes     int64     `json:"likes"`
-	CreatedAt time.Time `json:"created_at"`
+	ID        int64      `json:"id"`
+	Content   string     `json:"content"`
+	MediaURLs string     `json:"media_urls"` // 逗号分隔的图片/视频URL
+	Likes     int64      `json:"likes"`
+	Status    string     `json:"status"` // published / draft / scheduled
+	PublishAt *time.Time `json:"publish_at"`
+	CreatedAt time.Time  `json:"created_at"`
 }
 
 // Comment 评论模型

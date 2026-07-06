@@ -547,7 +547,7 @@ func IndexHandler(db *sql.DB) gin.HandlerFunc {
 		}
 
 		// 瞬间流（最近10条，随机排序）
-		momentRows, _ := db.Query("SELECT id, content, media_urls, likes, created_at FROM moments ORDER BY RANDOM() LIMIT 10")
+		momentRows, _ := db.Query("SELECT id, content, media_urls, likes, created_at FROM moments WHERE status='published' ORDER BY RANDOM() LIMIT 10")
 		var moments []models.MomentView
 		mediaMap := make(map[string][]string)
 		if momentRows != nil {
@@ -739,7 +739,7 @@ func MomentsListHandler(db *sql.DB) gin.HandlerFunc {
 		}
 		offset = (page - 1) * pageSize
 
-		momentRows, err := db.Query("SELECT id, content, media_urls, likes, created_at FROM moments ORDER BY created_at DESC LIMIT ? OFFSET ?", pageSize, offset)
+		momentRows, err := db.Query("SELECT id, content, media_urls, likes, created_at FROM moments WHERE status='published' ORDER BY created_at DESC LIMIT ? OFFSET ?", pageSize, offset)
 		if err != nil {
 			c.HTML(http.StatusInternalServerError, "moments.html", gin.H{"error": "查询失败"})
 			return
@@ -1246,7 +1246,7 @@ func SearchHandler(db *sql.DB) gin.HandlerFunc {
 			}
 
 			// 搜索瞬间
-			mRows, mErr := db.Query("SELECT id, content, media_urls, likes, created_at FROM moments WHERE content LIKE ? ORDER BY created_at DESC LIMIT 20", likeQuery)
+			mRows, mErr := db.Query("SELECT id, content, media_urls, likes, created_at FROM moments WHERE status='published' AND content LIKE ? ORDER BY created_at DESC LIMIT 20", likeQuery)
 			if mErr == nil && mRows != nil {
 				for mRows.Next() {
 					var m models.MomentView

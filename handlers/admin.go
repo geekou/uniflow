@@ -742,18 +742,32 @@ func AdminMomentList(db *sql.DB) gin.HandlerFunc {
 		data := adminData("瞬间列表", "moments", "list", getAdminUsername(c), db)
 		data["Mode"] = "list"
 
-		rows, _ := db.Query("SELECT id, content, media_urls, likes, created_at FROM moments ORDER BY id DESC")
+		searchQuery := strings.TrimSpace(c.Query("q"))
+		filterStatus := strings.TrimSpace(c.Query("status"))
+		data["SearchQuery"] = searchQuery
+		data["FilterStatus"] = filterStatus
+
+		query := "SELECT id, content, media_urls, likes, status, created_at FROM moments WHERE 1=1"
+		args := []interface{}{}
+		if filterStatus != "" {
+			query += " AND status = ?"
+			args = append(args, filterStatus)
+		}
+		if searchQuery != "" {
+			query += " AND content LIKE ?"
+			args = append(args, "%"+searchQuery+"%")
+		}
+		query += " ORDER BY id DESC"
+
+		rows, _ := db.Query(query, args...)
 		var moments []gin.H
 		if rows != nil {
 			for rows.Next() {
 				var m struct {
-					ID        int64
-					Content   string
-					MediaURLs string
-					Likes     int64
-					CreatedAt time.Time
+					ID        int64; Content string; MediaURLs string; Likes int64
+					Status    string; CreatedAt time.Time
 				}
-				scanLog(rows.Scan(&m.ID, &m.Content, &m.MediaURLs, &m.Likes, &m.CreatedAt), "adminMoments")
+				scanLog(rows.Scan(&m.ID, &m.Content, &m.MediaURLs, &m.Likes, &m.Status, &m.CreatedAt), "adminMoments")
 				var mediaList []string
 				if m.MediaURLs != "" {
 					mediaList = strings.Split(m.MediaURLs, ",")
@@ -761,7 +775,7 @@ func AdminMomentList(db *sql.DB) gin.HandlerFunc {
 				moments = append(moments, gin.H{
 					"ID": m.ID, "Content": m.Content, "MediaCount": len(mediaList),
 					"MediaList": mediaList, "MediaURLs": m.MediaURLs,
-					"Likes": m.Likes, "CreatedAt": m.CreatedAt,
+					"Likes": m.Likes, "Status": m.Status, "CreatedAt": m.CreatedAt,
 				})
 			}
 			rows.Close()
@@ -822,19 +836,34 @@ func AdminMomentCreatePost(db *sql.DB) gin.HandlerFunc {
 		}
 
 		createdAt := c.PostForm("created_at")
+		status := c.PostForm("status")
+		if status == "" { status = "published" }
+		publishAt := c.PostForm("publish_at")
+
+		// 定时发布：如果 publish_at 有值且在未来，覆盖 status 为 scheduled
+		if publishAt != "" && status != "draft" {
+			if t, err := time.Parse("2006-01-02T15:04", publishAt); err == nil && t.After(time.Now()) {
+				status = "scheduled"
+			}
+		}
 
 		if createdAt != "" {
-			// 解析用户提供的日期时间
 			t, err := time.Parse("2006-01-02T15:04", createdAt)
 			if err == nil {
-				execLog(db, "INSERT INTO moments (content, media_urls, created_at) VALUES (?, ?, ?)", content, mediaURLs, t.Format("2006-01-02 15:04:05"))
+				execLog(db, "INSERT INTO moments (content, media_urls, status, publish_at, created_at) VALUES (?, ?, ?, ?, ?)", content, mediaURLs, status, nil, t.Format("2006-01-02 15:04:05"))
 			} else {
-				execLog(db, "INSERT INTO moments (content, media_urls) VALUES (?, ?)", content, mediaURLs)
+				execLog(db, "INSERT INTO moments (content, media_urls, status) VALUES (?, ?, ?)", content, mediaURLs, status)
 			}
 		} else {
-			execLog(db, "INSERT INTO moments (content, media_urls) VALUES (?, ?)", content, mediaURLs)
+			var pAt interface{}
+			if publishAt != "" { pAt = publishAt } else { pAt = nil }
+			execLog(db, "INSERT INTO moments (content, media_urls, status, publish_at) VALUES (?, ?, ?, ?)", content, mediaURLs, status, pAt)
 		}
-		logOperation(db, getAdminUsername(c), c, "发布瞬间")
+		if status == "draft" {
+			logOperation(db, getAdminUsername(c), c, "保存瞬间草稿")
+		} else {
+			logOperation(db, getAdminUsername(c), c, "发布瞬间")
+		}
 		c.Redirect(http.StatusFound, "/admin/moments")
 	}
 }
@@ -850,8 +879,8 @@ func AdminMomentEdit(db *sql.DB) gin.HandlerFunc {
 			return
 		}
 		var m models.Moment
-		err := db.QueryRow("SELECT id, content, media_urls, likes, created_at FROM moments WHERE id = ?", id).
-			Scan(&m.ID, &m.Content, &m.MediaURLs, &m.Likes, &m.CreatedAt)
+		err := db.QueryRow("SELECT id, content, media_urls, likes, status, created_at FROM moments WHERE id = ?", id).
+			Scan(&m.ID, &m.Content, &m.MediaURLs, &m.Likes, &m.Status, &m.CreatedAt)
 		if err != nil {
 			c.String(404, "瞬间不存在")
 			return
@@ -1333,6 +1362,49 @@ func AdminMediaBatchDelete(db *sql.DB) gin.HandlerFunc {
 			deleted++
 		}
 		c.JSON(http.StatusOK, gin.H{"ok": true, "deleted": deleted})
+	}
+}
+
+// AdminMediaAPI 返回媒体文件 JSON 列表，供编辑器弹窗调用
+func AdminMediaAPI(db *sql.DB) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		uploadsDir := filepath.Join(getProjectRoot(c), "uploads")
+		entries, err := os.ReadDir(uploadsDir)
+		if err != nil {
+			c.JSON(http.StatusOK, gin.H{"ok": true, "files": []gin.H{}})
+			return
+		}
+
+		mediaType := c.DefaultQuery("type", "all")
+		var files []gin.H
+		for _, e := range entries {
+			if e.IsDir() {
+				continue
+			}
+			ext := strings.ToLower(filepath.Ext(e.Name()))
+			if mediaType == "photos" && !isImageExt(ext) {
+				continue
+			}
+			if mediaType == "videos" && !isVideoExt(ext) {
+				continue
+			}
+
+			info, _ := e.Info()
+			files = append(files, gin.H{
+				"name":    e.Name(),
+				"size":    utils.FormatFileSize(info.Size()),
+				"url":     "/uploads/" + e.Name(),
+				"modTime": info.ModTime(),
+			})
+		}
+
+		sort.Slice(files, func(i, j int) bool {
+			mi, _ := files[i]["modTime"].(time.Time)
+			mj, _ := files[j]["modTime"].(time.Time)
+			return mi.After(mj)
+		})
+
+		c.JSON(http.StatusOK, gin.H{"ok": true, "files": files})
 	}
 }
 

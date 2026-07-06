@@ -56,14 +56,65 @@
 
 {{else}}
     <!-- Form mode: create or edit -->
-    <div class="flex items-center justify-between mb-6">
+    <div class="flex items-center justify-between mb-6" id="post-header-bar">
         <h2 class="text-lg font-bold">{{if eq .Mode "create"}}发布文章{{else}}编辑文章{{end}}</h2>
-        <a href="/admin/posts" class="text-xs text-gray-400 hover:text-indigo-600 transition"><i class="fa-solid fa-arrow-left mr-1"></i>返回列表</a>
+        <div class="flex items-center gap-2">
+            <button type="button" onclick="togglePreview()" id="btn-preview" class="text-xs px-3 py-1.5 rounded-lg bg-gray-100 text-gray-600 hover:bg-indigo-50 hover:text-indigo-600 transition font-medium"><i class="fa-solid fa-eye mr-1"></i>预览</button>
+            <button type="button" onclick="toggleFullscreen()" id="btn-fullscreen" class="text-xs px-3 py-1.5 rounded-lg bg-gray-100 text-gray-600 hover:bg-indigo-50 hover:text-indigo-600 transition font-medium"><i class="fa-solid fa-expand mr-1"></i>全屏</button>
+            <a href="/admin/posts" class="text-xs text-gray-400 hover:text-indigo-600 transition"><i class="fa-solid fa-arrow-left mr-1"></i>返回列表</a>
+        </div>
     </div>
+
+    <style>
+        /* 全屏编辑器模式 */
+        body.post-fullscreen > div.flex.h-screen { overflow: hidden; }
+        body.post-fullscreen > div.flex.h-screen > aside { display: none !important; }
+        body.post-fullscreen > div.flex.h-screen > div.flex-1 > header { display: none !important; }
+        body.post-fullscreen > div.flex.h-screen > div.flex-1 > main { margin-left: 0 !important; margin-top: 0 !important; padding: 0 !important; }
+        #post-form.post-fullscreen { position: fixed; inset: 0; z-index: 1000; background: #f8fafc; overflow-y: auto; padding: 1.5rem; margin: 0; }
+        #post-form.post-fullscreen > .bg-white { max-width: 100% !important; }
+        #post-form.post-fullscreen #editor { height: calc(100vh - 280px) !important; min-height: 500px; }
+        #post-form.post-fullscreen #preview-panel { max-height: calc(100vh - 280px) !important; min-height: 500px; }
+        #post-form.post-fullscreen #post-header-bar { max-width: 100% !important; }
+        /* 预览面板基础排版 */
+        #preview-panel { line-height: 1.8; color: #374151; }
+        #preview-panel h1 { font-size: 1.5rem; font-weight: 700; margin: 1rem 0 0.5rem; }
+        #preview-panel h2 { font-size: 1.25rem; font-weight: 700; margin: 0.875rem 0 0.5rem; }
+        #preview-panel h3 { font-size: 1.1rem; font-weight: 600; margin: 0.75rem 0 0.375rem; }
+        #preview-panel p { margin: 0.5rem 0; }
+        #preview-panel blockquote { border-left: 3px solid #818cf8; padding-left: 1rem; margin: 0.75rem 0; color: #6b7280; }
+        #preview-panel pre { background: #1e293b; color: #e2e8f0; padding: 1rem; border-radius: 0.75rem; overflow-x: auto; font-size: 0.8125rem; margin: 0.75rem 0; }
+        #preview-panel code { background: #f1f5f9; padding: 0.125rem 0.375rem; border-radius: 0.25rem; font-size: 0.8125rem; }
+        #preview-panel pre code { background: none; padding: 0; }
+        #preview-panel img, #preview-panel video { max-width: 100%; border-radius: 0.75rem; margin: 0.5rem 0; }
+        #preview-panel ul, #preview-panel ol { padding-left: 1.5rem; margin: 0.5rem 0; }
+        #preview-panel li { margin: 0.25rem 0; }
+        #preview-panel a { color: #6366f1; text-decoration: underline; }
+        /* 自定义工具栏按钮 — 对齐 Quill 原生样式 */
+        .ql-custom-group { border-left: 1px solid #e5e7eb; padding-left: 12px; margin-left: 4px; }
+        .ql-toolbar button i { font-size: 16px; color: #444; vertical-align: middle; line-height: 1; }
+        .ql-toolbar button:hover i { color: #06c; }
+        .ql-toolbar button.ql-active i { color: #06c; }
+        .ql-toolbar button.ql-callout i,
+        .ql-toolbar button.ql-badge i { font-size: 16px; }
+        /* 编辑器内自定义元素样式 */
+        .ql-editor .callout { padding: 0.75rem 1rem; border-radius: 0.75rem; margin: 0.75rem 0; border-left: 4px solid; }
+        .ql-editor .callout-info { background: #eff6ff; border-color: #3b82f6; }
+        .ql-editor .callout-warning { background: #fffbeb; border-color: #f59e0b; }
+        .ql-editor .callout-success { background: #f0fdf4; border-color: #22c55e; }
+        .ql-editor .callout-danger { background: #fef2f2; border-color: #ef4444; }
+        .ql-editor .badge { display: inline-block; padding: 0.125rem 0.5rem; border-radius: 9999px; font-size: 0.75rem; font-weight: 600; color: #fff; vertical-align: middle; }
+        .ql-editor .badge-blue { background: #3b82f6; }
+        .ql-editor .badge-green { background: #22c55e; }
+        .ql-editor .badge-red { background: #ef4444; }
+        .ql-editor .badge-yellow { background: #eab308; color: #000; }
+        .ql-editor .badge-purple { background: #a855f7; }
+        .ql-editor .badge-gray { background: #6b7280; }
+    </style>
 
     <form id="post-form" method="POST" data-no-toast enctype="multipart/form-data" action="{{if eq .Mode "create"}}/admin/posts/create{{else}}/admin/posts/edit/{{.Post.ID}}{{end}}" class="space-y-4">
         <input type="hidden" name="content" id="hidden-content">
-        <input type="hidden" name="status" value="{{if eq .Mode "create"}}published{{else}}{{.Post.Status}}{{end}}">
+        <input type="hidden" name="status" value="{{if eq .Mode "create"}}published{{else if eq .Post.Status "draft"}}published{{else}}{{.Post.Status}}{{end}}">
         <div class="bg-white rounded-2xl p-6 shadow-xs border border-gray-100/50 space-y-4">
             <div>
                 <label class="text-xs font-medium text-gray-500 mb-1 block">文章标题</label>
@@ -72,6 +123,7 @@
             <div>
                 <label class="text-xs font-medium text-gray-500 mb-1 block">文章内容</label>
                 <div id="editor" style="height: 400px;"></div>
+                <div id="preview-panel" class="hidden rounded-xl border border-gray-200 p-6 min-h-[400px] prose prose-sm max-w-none bg-white" style="overflow-y:auto;max-height:600px;"></div>
             </div>
             <!-- Quick settings inline -->
             <div class="grid grid-cols-3 gap-4 pt-3 border-t border-gray-50">
@@ -125,12 +177,34 @@
                 </div>
             </div>
         </div>
-        <div class="flex justify-end">
+        <div class="flex justify-end gap-2">
+            <button type="button" onclick="saveDraftAction()" class="bg-gray-100 text-gray-600 text-sm px-6 py-2.5 rounded-xl font-medium hover:bg-gray-200 transition">
+                <i class="fa-regular fa-save mr-1"></i> 保存草稿
+            </button>
             <button type="submit" onclick="syncContent()" class="bg-indigo-600 text-white text-sm px-6 py-2.5 rounded-xl font-medium hover:bg-indigo-700 transition shadow-xs shadow-indigo-100">
-                <i class="fa-solid fa-paper-plane mr-1"></i> {{if eq .Mode "create"}}发布文章{{else}}更新文章{{end}}
+                <i class="fa-solid fa-paper-plane mr-1"></i> {{if eq .Mode "create"}}发布文章{{else if eq .Post.Status "draft"}}发布文章{{else}}更新文章{{end}}
             </button>
         </div>
     </form>
+
+    <!-- ====== 媒体库选择弹窗 ====== -->
+    <div id="media-picker-overlay" class="fixed inset-0 bg-black/40 z-50 hidden flex items-center justify-center" onclick="closeMediaPicker(event)">
+        <div class="bg-white rounded-2xl shadow-2xl w-full max-w-3xl max-h-[80vh] flex flex-col m-4" onclick="event.stopPropagation()">
+            <div class="flex items-center justify-between p-4 border-b border-gray-100">
+                <div class="flex items-center gap-2">
+                    <h3 class="text-sm font-bold text-gray-700">选择媒体</h3>
+                    <div class="flex bg-gray-100 rounded-lg p-0.5">
+                        <button class="media-picker-tab px-3 py-1 text-xs rounded-md transition active" data-type="photos" onclick="switchMediaPickerTab('photos', this)">图片</button>
+                        <button class="media-picker-tab px-3 py-1 text-xs rounded-md transition" data-type="videos" onclick="switchMediaPickerTab('videos', this)">视频</button>
+                    </div>
+                </div>
+                <button onclick="closeMediaPickerDirect()" class="text-gray-400 hover:text-gray-600 text-lg leading-none">&times;</button>
+            </div>
+            <div id="media-picker-grid" class="grid grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-3 p-4 overflow-y-auto flex-1">
+                <div class="col-span-full text-center py-8 text-sm text-gray-400">加载中...</div>
+            </div>
+        </div>
+    </div>
 
     <link href="/static/vendor/quill/quill.snow.css" rel="stylesheet">
     <script src="/static/vendor/quill/quill.js"></script>
@@ -164,6 +238,46 @@
         VideoBlot.tagName = 'div';
         Quill.register(VideoBlot, true);
 
+        // ====== 自定义 Blot 注册 ======
+        // 提示框 (Block Embed)
+        class CalloutBlot extends BlockEmbed {
+            static create(value) {
+                var node = super.create();
+                var type = value || 'info';
+                node.classList.add('callout', 'callout-' + type);
+                node.setAttribute('data-type', type);
+                // 默认占位内容 — 用户可在前后编辑正文
+                return node;
+            }
+            static value(node) {
+                return node.getAttribute('data-type') || 'info';
+            }
+        }
+        CalloutBlot.blotName = 'callout';
+        CalloutBlot.tagName = 'div';
+        CalloutBlot.className = 'callout';
+        Quill.register(CalloutBlot, true);
+
+        // 标签 (Inline Embed)
+        class BadgeBlot extends Quill.import('blots/embed') {
+            static create(value) {
+                var node = super.create();
+                var color = (value && value.color) || 'blue';
+                node.classList.add('badge', 'badge-' + color);
+                node.textContent = (value && value.text) || '标签';
+                return node;
+            }
+            static value(node) {
+                var cls = node.className;
+                var match = cls.match(/badge-(\w+)/);
+                return { color: match ? match[1] : 'blue', text: node.textContent };
+            }
+        }
+        BadgeBlot.blotName = 'badge';
+        BadgeBlot.tagName = 'span';
+        BadgeBlot.className = 'badge';
+        Quill.register(BadgeBlot, true);
+
         // Upload helper: post file to /admin/upload, return URL
         function uploadFile(file, callback) {
             var fd = new FormData();
@@ -186,51 +300,88 @@
                         [{ 'header': [1, 2, 3, false] }],
                         ['bold', 'italic', 'underline', 'strike'],
                         [{ 'color': [] }, { 'background': [] }],
+                        ['link', 'image'],
                         [{ 'list': 'ordered'}, { 'list': 'bullet' }],
-                        ['blockquote', 'code-block'],
-                        ['link', 'image', 'video'],
-                        ['clean']
+                        ['blockquote', 'code-block']
                     ],
                     handlers: {
                         image: function() {
-                            var input = document.createElement('input');
-                            input.setAttribute('type', 'file');
-                            input.setAttribute('accept', 'image/*');
-                            input.click();
-                            input.onchange = function() {
-                                var file = input.files[0];
-                                if (!file) return;
-                                var range = quill.getSelection(true);
-                                quill.insertText(range.index, '\n', Quill.sources.USER);
+                            var range = quill.getSelection(true);
+                            showMediaChoice('all', function(url) {
+                                // 根据 URL 后缀自动判断图片还是视频
+                                var isVideo = /\.(mp4|webm|avi|mov)$/i.test(url);
+                                quill.insertEmbed(range.index, isVideo ? 'video' : 'image', url, Quill.sources.USER);
                                 quill.setSelection(range.index + 1, Quill.sources.SILENT);
-                                uploadFile(file, function(url) {
-                                    quill.insertEmbed(range.index + 1, 'image', url, Quill.sources.USER);
-                                    quill.setSelection(range.index + 2, Quill.sources.SILENT);
-                                });
-                            };
-                        },
-                        video: function() {
-                            var input = document.createElement('input');
-                            input.setAttribute('type', 'file');
-                            input.setAttribute('accept', 'video/*');
-                            input.click();
-                            input.onchange = function() {
-                                var file = input.files[0];
-                                if (!file) return;
-                                var range = quill.getSelection(true);
-                                quill.insertText(range.index, '\n', Quill.sources.USER);
-                                quill.setSelection(range.index + 1, Quill.sources.SILENT);
-                                uploadFile(file, function(url) {
-                                    quill.insertEmbed(range.index + 1, 'video', url, Quill.sources.USER);
-                                    quill.setSelection(range.index + 2, Quill.sources.SILENT);
-                                });
-                            };
+                            });
                         }
                     }
                 }
             }
         });
         {{if .PostContentJS}}quill.root.innerHTML = {{.PostContentJS}};{{end}}
+
+        // ====== 手动注入自定义工具栏按钮（合并为一组） ======
+        (function injectCustomToolbar() {
+            var tbar = document.querySelector('.ql-toolbar');
+            if (!tbar) return;
+            var group = document.createElement('span');
+            group.className = 'ql-formats ql-custom-group';
+
+            var btns = [
+                { cls: 'ql-callout', title: '提示框：信息/警告/成功/危险', icon: 'fa-solid fa-bullhorn', handler: function() { showCalloutPicker(); } },
+                { cls: 'ql-badge', title: '标签：彩色徽章', icon: 'fa-solid fa-tag', handler: function() { insertBadge(); } }
+            ];
+
+            for (var i = 0; i < btns.length; i++) {
+                var b = btns[i];
+                var btn = document.createElement('button');
+                btn.className = b.cls;
+                btn.type = 'button';
+                btn.title = b.title;
+                btn.innerHTML = '<i class="' + b.icon + '"></i>';
+                btn.onclick = b.handler;
+                group.appendChild(btn);
+            }
+
+            // 插入到最后一个原生按钮组（clean）之前
+            var groups = tbar.querySelectorAll(':scope > .ql-formats');
+            var cleanGroup = groups[groups.length - 1];
+            if (cleanGroup) {
+                tbar.insertBefore(group, cleanGroup);
+            } else {
+                tbar.appendChild(group);
+            }
+        })();
+
+        function saveDraftAction() {
+            syncContent();
+            var form = document.getElementById('post-form');
+            var formData = new FormData(form);
+            formData.set('status', 'draft');
+            formData.delete('publish_at'); // 草稿忽略定时
+            var isEdit = form.action.includes('/edit/');
+            var btn = document.querySelector('#post-form .flex button:first-child');
+            var origHTML = btn.innerHTML;
+            btn.disabled = true;
+            btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin mr-1"></i> 保存中...';
+            fetch(form.action, { method: 'POST', body: formData, credentials: 'same-origin', headers: {'X-Requested-With': 'fetch'} })
+                .then(function(r) {
+                    if (r.redirected || r.ok) {
+                        localStorage.removeItem(_draftKey);
+                        showToast('草稿已保存', 'success');
+                        setTimeout(function() { window.location.href = '/admin/posts?status=draft'; }, 600);
+                    } else {
+                        showToast('保存失败', 'error');
+                        btn.disabled = false;
+                        btn.innerHTML = origHTML;
+                    }
+                })
+                .catch(function() {
+                    showToast('请求失败', 'error');
+                    btn.disabled = false;
+                    btn.innerHTML = origHTML;
+                });
+        }
 
         function syncContent() {
             document.getElementById('hidden-content').value = quill.root.innerHTML;
@@ -254,7 +405,8 @@
             fetch(form.action, { method: 'POST', body: formData, credentials: 'same-origin', headers: {'X-Requested-With': 'fetch'} })
                 .then(function(r) {
                     if (r.redirected || r.ok) {
-                        showToast(isEdit ? '文章已更新' : '文章已发布', 'success');
+                        var isDraft = formData.get('status') === 'draft';
+                        showToast(isEdit ? (isDraft ? '草稿已保存' : '文章已更新') : '文章已发布', 'success');
                         setTimeout(function() { window.location.href = '/admin/posts'; }, 600);
                     } else {
                         showToast('操作失败', 'error');
@@ -278,9 +430,272 @@
             }
         }
 
-        // ====== 草稿自动保存 ======
+        // ====== 全屏 / 预览切换 ======
+        var _isFullscreen = false;
+        var _isPreview = false;
+
+        function toggleFullscreen() {
+            _isFullscreen = !_isFullscreen;
+            var form = document.getElementById('post-form');
+            var btn = document.getElementById('btn-fullscreen');
+            if (_isFullscreen) {
+                document.body.classList.add('post-fullscreen');
+                form.classList.add('post-fullscreen');
+                btn.innerHTML = '<i class="fa-solid fa-compress mr-1"></i>退出全屏';
+                btn.classList.add('bg-indigo-100', 'text-indigo-700');
+                // 扩大编辑器
+                if (!_isPreview) {
+                    document.getElementById('editor').style.height = 'calc(100vh - 280px)';
+                }
+            } else {
+                document.body.classList.remove('post-fullscreen');
+                form.classList.remove('post-fullscreen');
+                btn.innerHTML = '<i class="fa-solid fa-expand mr-1"></i>全屏';
+                btn.classList.remove('bg-indigo-100', 'text-indigo-700');
+                if (!_isPreview) {
+                    document.getElementById('editor').style.height = '400px';
+                }
+            }
+        }
+
+        function togglePreview() {
+            _isPreview = !_isPreview;
+            var editor = document.getElementById('editor');
+            var preview = document.getElementById('preview-panel');
+            var btn = document.getElementById('btn-preview');
+            if (_isPreview) {
+                // 同步内容到预览
+                preview.innerHTML = quill.root.innerHTML;
+                editor.style.display = 'none';
+                preview.classList.remove('hidden');
+                btn.innerHTML = '<i class="fa-solid fa-pen-to-square mr-1"></i>编辑';
+                btn.classList.add('bg-indigo-100', 'text-indigo-700');
+            } else {
+                editor.style.display = '';
+                preview.classList.add('hidden');
+                btn.innerHTML = '<i class="fa-solid fa-eye mr-1"></i>预览';
+                btn.classList.remove('bg-indigo-100', 'text-indigo-700');
+            }
+        }
+
+        // ESC 退出全屏或预览
+        document.addEventListener('keydown', function(e) {
+            if (e.key === 'Escape') {
+                if (_isFullscreen) { toggleFullscreen(); return; }
+                if (_isPreview) { togglePreview(); return; }
+            }
+        });
+
+        // ====== 自定义 Blot：提示框 / 折叠面板 / 按钮 / 标签 ======
+        function insertCallout(type) {
+            var range = quill.getSelection(true);
+            quill.insertEmbed(range.index, 'callout', type, Quill.sources.USER);
+            quill.setSelection(range.index + 1, Quill.sources.SILENT);
+        }
+
+        function showCalloutPicker() {
+            var types = [
+                { key: 'info', icon: '💡', label: '提示', color: '#3b82f6' },
+                { key: 'warning', icon: '⚠️', label: '警告', color: '#f59e0b' },
+                { key: 'success', icon: '✅', label: '成功', color: '#22c55e' },
+                { key: 'danger', icon: '❌', label: '危险', color: '#ef4444' }
+            ];
+            var popup = document.createElement('div');
+            popup.id = 'callout-picker-popup';
+            popup.style.cssText = 'position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);background:#fff;border-radius:1rem;box-shadow:0 20px 60px rgba(0,0,0,0.2);z-index:9999;padding:1.25rem;display:flex;flex-direction:column;gap:0.5rem;min-width:200px;';
+            var html = '<p class="text-sm font-medium text-gray-700 mb-1">选择提示框类型</p>';
+            for (var i = 0; i < types.length; i++) {
+                var t = types[i];
+                html += '<button class="w-full text-left px-3 py-2 rounded-lg text-sm hover:opacity-80 transition font-medium" style="background:' + t.color + '15;color:' + t.color + '" data-type="' + t.key + '">' + t.icon + ' ' + t.label + '</button>';
+            }
+            html += '<button class="w-full text-center text-xs text-gray-400 hover:text-gray-600 pt-1 cancel-btn">取消</button>';
+            popup.innerHTML = html;
+            document.body.appendChild(popup);
+
+            var overlay = document.createElement('div');
+            overlay.style.cssText = 'position:fixed;inset:0;z-index:9998;';
+            overlay.onclick = function() { popup.remove(); overlay.remove(); };
+            document.body.appendChild(overlay);
+
+            popup.querySelectorAll('button[data-type]').forEach(function(btn) {
+                btn.onclick = function() {
+                    var type = this.dataset.type;
+                    popup.remove(); overlay.remove();
+                    insertCallout(type);
+                };
+            });
+            popup.querySelector('.cancel-btn').onclick = function() { popup.remove(); overlay.remove(); };
+        }
+
+        function insertBadge() {
+            var colors = [
+                { key: 'blue', label: '蓝', color: '#3b82f6' },
+                { key: 'green', label: '绿', color: '#22c55e' },
+                { key: 'red', label: '红', color: '#ef4444' },
+                { key: 'yellow', label: '黄', color: '#eab308' },
+                { key: 'purple', label: '紫', color: '#a855f7' },
+                { key: 'gray', label: '灰', color: '#6b7280' }
+            ];
+            var popup = document.createElement('div');
+            popup.id = 'badge-picker-popup';
+            popup.style.cssText = 'position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);background:#fff;border-radius:1rem;box-shadow:0 20px 60px rgba(0,0,0,0.2);z-index:9999;padding:1.25rem;display:flex;flex-direction:column;gap:0.5rem;min-width:220px;';
+            var html = '<p class="text-sm font-medium text-gray-700 mb-1">选择标签颜色</p><div class="flex flex-wrap gap-2">';
+            for (var i = 0; i < colors.length; i++) {
+                var c = colors[i];
+                html += '<button class="w-8 h-8 rounded-full border-2 border-white shadow-sm hover:scale-110 transition" style="background:' + c.color + '" data-color="' + c.key + '" title="' + c.label + '"></button>';
+            }
+            html += '</div><input type="text" id="badge-text-input" placeholder="标签文字" class="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm mt-2 outline-none focus:ring-2 focus:ring-indigo-200"><div class="flex gap-2 mt-1"><button id="badge-confirm-btn" class="flex-1 bg-indigo-600 text-white text-xs px-3 py-2 rounded-lg font-medium hover:bg-indigo-700 transition">确定</button><button class="flex-1 bg-gray-100 text-gray-600 text-xs px-3 py-2 rounded-lg font-medium hover:bg-gray-200 transition cancel-btn">取消</button></div>';
+            popup.innerHTML = html;
+            document.body.appendChild(popup);
+
+            var overlay = document.createElement('div');
+            overlay.style.cssText = 'position:fixed;inset:0;z-index:9998;';
+            var selectedColor = 'blue';
+            overlay.onclick = function() { popup.remove(); overlay.remove(); };
+            document.body.appendChild(overlay);
+
+            popup.querySelectorAll('button[data-color]').forEach(function(btn) {
+                btn.onclick = function() {
+                    selectedColor = this.dataset.color;
+                    popup.querySelectorAll('button[data-color]').forEach(function(b) { b.classList.remove('ring-2', 'ring-indigo-400'); });
+                    this.classList.add('ring-2', 'ring-indigo-400');
+                };
+            });
+            popup.querySelector('.cancel-btn').onclick = function() { popup.remove(); overlay.remove(); };
+            popup.querySelector('#badge-confirm-btn').onclick = function() {
+                var text = popup.querySelector('#badge-text-input').value.trim() || '标签';
+                popup.remove(); overlay.remove();
+                var range = quill.getSelection(true);
+                quill.insertEmbed(range.index, 'badge', { color: selectedColor, text: text }, Quill.sources.USER);
+                quill.insertText(range.index + 1, ' ', Quill.sources.USER);
+                quill.setSelection(range.index + 2, Quill.sources.SILENT);
+            };
+            popup.querySelector('button[data-color="blue"]').classList.add('ring-2', 'ring-indigo-400');
+        }
+
+        // ====== 媒体库选择弹窗逻辑 ======
+        var _mediaPickerCallback = null;
+        var _mediaPickerType = 'photos';
+
+        function showMediaChoice(type, callback) {
+            _mediaPickerCallback = callback;
+            _mediaPickerType = type;
+            // 先弹小浮层：上传 / 从媒体库选择
+            var choice = document.createElement('div');
+            choice.id = 'media-choice-popup';
+            choice.style.cssText = 'position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);background:#fff;border-radius:1rem;box-shadow:0 20px 60px rgba(0,0,0,0.2);z-index:9999;padding:1.5rem;display:flex;flex-direction:column;gap:0.75rem;min-width:240px;';
+            choice.innerHTML = '<p class="text-sm font-medium text-gray-700 mb-1">选择媒体来源</p>' +
+                '<button class="w-full text-left px-4 py-2.5 rounded-xl text-sm bg-indigo-50 text-indigo-700 hover:bg-indigo-100 transition font-medium"><i class="fa-solid fa-cloud-arrow-up mr-2"></i>上传新文件</button>' +
+                '<button class="w-full text-left px-4 py-2.5 rounded-xl text-sm bg-gray-50 text-gray-700 hover:bg-gray-100 transition font-medium"><i class="fa-solid fa-images mr-2"></i>从媒体库选择</button>' +
+                '<button class="w-full text-center text-xs text-gray-400 hover:text-gray-600 pt-1">取消</button>';
+            document.body.appendChild(choice);
+            // 上传按钮
+            choice.querySelectorAll('button')[0].onclick = function() {
+                choice.remove();
+                var input = document.createElement('input');
+                input.type = 'file';
+                input.accept = 'image/*,video/*';
+                input.click();
+                input.onchange = function() {
+                    var file = input.files[0];
+                    if (!file) return;
+                    uploadFile(file, function(url) { _mediaPickerCallback(url); });
+                };
+            };
+            // 从媒体库选择按钮
+            choice.querySelectorAll('button')[1].onclick = function() {
+                choice.remove();
+                openMediaPicker(type);
+            };
+            // 取消按钮
+            choice.querySelectorAll('button')[2].onclick = function() { choice.remove(); };
+            // 点击遮罩关闭
+            setTimeout(function() {
+                var overlay = document.createElement('div');
+                overlay.id = 'media-choice-overlay';
+                overlay.style.cssText = 'position:fixed;inset:0;z-index:9998;';
+                overlay.onclick = function() { choice.remove(); overlay.remove(); };
+                document.body.appendChild(overlay);
+                choice._overlay = overlay;
+            }, 10);
+        }
+
+        function openMediaPicker(type) {
+            _mediaPickerType = type;
+            var displayType = type === 'all' ? 'photos' : type;
+            document.getElementById('media-picker-overlay').classList.remove('hidden');
+            document.getElementById('media-picker-overlay').classList.add('flex');
+            // 重置 tab
+            document.querySelectorAll('.media-picker-tab').forEach(function(t) {
+                t.classList.toggle('active', t.dataset.type === displayType);
+                t.classList.toggle('bg-white', t.dataset.type === displayType);
+                t.classList.toggle('shadow-xs', t.dataset.type === displayType);
+                t.classList.toggle('text-gray-700', t.dataset.type === displayType);
+                t.classList.toggle('text-gray-400', t.dataset.type !== displayType);
+            });
+            loadMediaFiles(displayType);
+        }
+
+        function closeMediaPicker(e) {
+            if (e && e.target !== document.getElementById('media-picker-overlay')) return;
+            closeMediaPickerDirect();
+        }
+
+        function closeMediaPickerDirect() {
+            document.getElementById('media-picker-overlay').classList.add('hidden');
+            document.getElementById('media-picker-overlay').classList.remove('flex');
+        }
+
+        function switchMediaPickerTab(type, btn) {
+            document.querySelectorAll('.media-picker-tab').forEach(function(t) {
+                t.classList.remove('active', 'bg-white', 'shadow-xs', 'text-gray-700');
+                t.classList.add('text-gray-400');
+            });
+            btn.classList.add('active', 'bg-white', 'shadow-xs', 'text-gray-700');
+            btn.classList.remove('text-gray-400');
+            loadMediaFiles(type);
+        }
+
+        function loadMediaFiles(type) {
+            var grid = document.getElementById('media-picker-grid');
+            grid.innerHTML = '<div class="col-span-full text-center py-8 text-sm text-gray-400">加载中...</div>';
+            fetch('/admin/media/api?type=' + type, { credentials: 'same-origin', headers: {'X-Requested-With': 'fetch'} })
+                .then(function(r) { return r.json(); })
+                .then(function(res) {
+                    if (!res.ok || !res.files || res.files.length === 0) {
+                        grid.innerHTML = '<div class="col-span-full text-center py-8 text-sm text-gray-400">暂无文件</div>';
+                        return;
+                    }
+                    var html = '';
+                    for (var i = 0; i < res.files.length; i++) {
+                        var f = res.files[i];
+                        html += '<div class="aspect-square bg-gray-100 rounded-xl overflow-hidden cursor-pointer border-2 border-transparent hover:border-indigo-400 transition relative group" onclick="selectMediaFile(\'' + f.url + '\')">';
+                        if (type === 'photos') {
+                            html += '<img loading="lazy" src="' + f.url + '" class="w-full h-full object-cover">';
+                        } else {
+                            html += '<video src="' + f.url + '" class="w-full h-full object-cover" preload="metadata"></video>';
+                            html += '<div class="absolute inset-0 flex items-center justify-center"><div class="w-8 h-8 rounded-full bg-black/40 flex items-center justify-center"><i class="fa-solid fa-play text-white text-xs"></i></div></div>';
+                        }
+                        html += '<div class="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/50 to-transparent p-2 opacity-0 group-hover:opacity-100 transition"><p class="text-[10px] text-white line-clamp-1">' + f.name + '</p></div>';
+                        html += '</div>';
+                    }
+                    grid.innerHTML = html;
+                })
+                .catch(function() {
+                    grid.innerHTML = '<div class="col-span-full text-center py-8 text-sm text-red-400">加载失败，请重试</div>';
+                });
+        }
+
+        function selectMediaFile(url) {
+            closeMediaPickerDirect();
+            if (_mediaPickerCallback) {
+                _mediaPickerCallback(url);
+                _mediaPickerCallback = null;
+            }
+        }
         var _draftKey = 'draft-' + ({{if eq .Mode "create"}}'new'{{else}}{{.Post.ID}}{{end}});
         var _draftSaved = false;
+        {{if eq .Mode "edit"}}localStorage.removeItem(_draftKey);{{end}}
         function saveDraft() {
             var title = document.querySelector('input[name="title"]').value;
             var html = quill.root.innerHTML;
@@ -301,8 +716,8 @@
                 }
             } catch(e) { localStorage.removeItem(_draftKey); }
         })();
-        // 每30秒自动保存
-        setInterval(saveDraft, 10000);
+        // 每10秒自动保存（仅新建模式）
+        {{if eq .Mode "create"}}setInterval(saveDraft, 10000);{{end}}
         // 提交成功后清除草稿
         document.getElementById('post-form').addEventListener('submit', function() {
             localStorage.removeItem(_draftKey);

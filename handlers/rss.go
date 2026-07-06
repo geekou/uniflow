@@ -4,6 +4,7 @@ import (
 	"database/sql"
 	"encoding/xml"
 	"net/http"
+	"sort"
 	"time"
 
 	"github.com/gin-gonic/gin"
@@ -36,42 +37,84 @@ func RSSHandler(db *sql.DB) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		settings, _ := getSiteSettings(db)
 
-		rows, err := db.Query(`
+		baseURL := "https://" + c.Request.Host
+		if c.Request.TLS == nil {
+			baseURL = "http://" + c.Request.Host
+		}
+
+		type feedItem struct {
+			title     string
+			link      string
+			content   string
+			createdAt time.Time
+		}
+		var items []feedItem
+
+		// 文章
+		pRows, err := db.Query(`
 			SELECT id, title, content, created_at
 			FROM posts
 			WHERE status='published' AND privacy='public'
 			ORDER BY created_at DESC
 			LIMIT 20
 		`)
-		if err != nil {
-			c.String(http.StatusInternalServerError, "error")
-			return
-		}
-		defer rows.Close()
-
-		baseURL := "https://" + c.Request.Host
-		if c.Request.TLS == nil {
-			baseURL = "http://" + c.Request.Host
-		}
-
-		var items []RSSItem
-		for rows.Next() {
-			var id int64
-			var title, content string
-			var createdAt time.Time
-			rows.Scan(&id, &title, &content, &createdAt)
-
-			desc := content
-			if len([]rune(desc)) > 300 {
-				desc = string([]rune(desc)[:300]) + "..."
+		if err == nil && pRows != nil {
+			defer pRows.Close()
+			for pRows.Next() {
+				var id int64
+				var title, content string
+				var t time.Time
+				pRows.Scan(&id, &title, &content, &t)
+				items = append(items, feedItem{
+					title:     title,
+					link:      baseURL + "/post/" + itoa(id),
+					content:   truncateRunes(content, 200),
+					createdAt: t,
+				})
 			}
+		}
 
-			items = append(items, RSSItem{
-				Title:       title,
-				Link:        baseURL + "/post/" + itoa(id),
-				Description: desc,
-				PubDate:     createdAt.Format(time.RFC1123Z),
-				GUID:        baseURL + "/post/" + itoa(id),
+		// 瞬间
+		mRows, err := db.Query(`
+			SELECT id, content, created_at
+			FROM moments
+			ORDER BY created_at DESC
+			LIMIT 20
+		`)
+		if err == nil && mRows != nil {
+			defer mRows.Close()
+			for mRows.Next() {
+				var id int64
+				var content string
+				var t time.Time
+				mRows.Scan(&id, &content, &t)
+				items = append(items, feedItem{
+					title:     "💬 瞬间",
+					link:      baseURL + "/moments#" + itoa(id),
+					content:   truncateRunes(content, 200),
+					createdAt: t,
+				})
+			}
+		}
+
+		// 按时间降序排列
+		sort.Slice(items, func(i, j int) bool {
+			return items[i].createdAt.After(items[j].createdAt)
+		})
+
+		// 取前 30 条
+		if len(items) > 30 {
+			items = items[:30]
+		}
+
+		var rssItems []RSSItem
+		for _, it := range items {
+			rssItems = append(rssItems, RSSItem{
+				Title:       it.title,
+				Link:        it.link,
+				Description: it.content,
+				PubDate:     it.createdAt.Format(time.RFC1123Z),
+				GUID:        it.link,
 			})
 		}
 
@@ -83,7 +126,7 @@ func RSSHandler(db *sql.DB) gin.HandlerFunc {
 				Description: settings["site_subtitle"],
 				Language:    "zh-CN",
 				LastBuild:   time.Now().Format(time.RFC1123Z),
-				Items:       items,
+				Items:       rssItems,
 			},
 		}
 
@@ -102,4 +145,12 @@ func itoa(n int64) string {
 		n /= 10
 	}
 	return string(digits)
+}
+
+func truncateRunes(s string, max int) string {
+	r := []rune(s)
+	if len(r) > max {
+		return string(r[:max]) + "..."
+	}
+	return s
 }

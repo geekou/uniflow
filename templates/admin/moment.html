@@ -2,28 +2,55 @@
 
 {{if eq .Mode "list"}}
     <div class="flex items-center justify-between mb-6">
-        <h2 class="text-lg font-bold">瞬间列表 <span class="text-sm text-gray-400 font-normal ml-1">(共 {{len .Moments}} 条)</span></h2>
+        <h2 class="text-lg font-bold">瞬间列表</h2>
         <a href="/admin/moments/create" class="bg-indigo-600 text-white text-xs px-4 py-2 rounded-xl font-medium hover:bg-indigo-700 transition shadow-xs shadow-indigo-100"><i class="fa-solid fa-plus mr-1"></i>发布瞬间</a>
     </div>
 
-    <div class="space-y-3">
-        {{range .Moments}}
-        <div class="bg-white rounded-2xl p-5 shadow-xs border border-gray-100/50 flex items-start justify-between gap-4">
-            <div class="flex-1 min-w-0">
-                <p class="text-sm text-gray-700 line-clamp-2 mb-2">{{.Content}}</p>
-                {{if .MediaURLs}}<div class="flex space-x-1 mt-1">{{range $i, $url := .MediaList}}{{if lt $i 4}}{{if isVideo $url}}<video src="{{$url}}" class="w-12 h-12 rounded-lg object-contain" preload="metadata"></video>{{else}}<img loading="lazy" src="{{$url}}" class="w-12 h-12 rounded-lg object-cover">{{end}}{{end}}{{end}}{{if gt (len .MediaList) 4}}<span class="w-12 h-12 rounded-lg bg-gray-100 flex items-center justify-center text-[10px] text-gray-400">+{{sub (len .MediaList) 4}}</span>{{end}}</div>{{end}}
-                <div class="flex items-center space-x-4 mt-2 text-[11px] text-gray-400">
-                    <span><i class="fa-regular fa-calendar mr-1"></i>{{formatTime .CreatedAt}}</span>
-                    <span><i class="fa-solid fa-heart text-red-300 mr-1"></i>{{.Likes}}</span>
-                </div>
-            </div>
-            <div class="flex items-center space-x-2 shrink-0">
-                <a href="/admin/moments/edit/{{.ID}}" class="text-xs text-indigo-500 hover:text-indigo-700"><i class="fa-solid fa-pen-to-square"></i></a>
-                <button onclick="confirmAction('确定删除此瞬间？', '/admin/moments/delete/{{.ID}}')" class="text-xs text-red-400 hover:text-red-600"><i class="fa-solid fa-trash"></i></button>
-            </div>
+    <div class="bg-white rounded-2xl shadow-xs border border-gray-100/50 overflow-hidden">
+        <!-- Search -->
+        <div class="p-4 border-b border-gray-50 flex items-center space-x-3">
+            <form method="GET" action="/admin/moments" class="flex items-center flex-1 bg-gray-50 px-3 py-2 rounded-xl border border-gray-100">
+                <i class="fa-solid fa-magnifying-glass text-gray-400 text-xs mr-2"></i>
+                <input type="text" name="q" placeholder="搜索瞬间内容..." value="{{.SearchQuery}}" class="bg-transparent text-sm flex-1 outline-none placeholder-gray-400">
+            </form>
+            <select onchange="location.href='/admin/moments?status='+this.value{{if .SearchQuery}}+'&q={{.SearchQuery}}'{{end}}" class="border border-gray-200 rounded-xl px-3 py-2 text-xs outline-none">
+                <option value="">全部状态</option>
+                <option value="published" {{if eq .FilterStatus "published"}}selected{{end}}>已发布</option>
+                <option value="draft" {{if eq .FilterStatus "draft"}}selected{{end}}>草稿</option>
+                <option value="scheduled" {{if eq .FilterStatus "scheduled"}}selected{{end}}>定时</option>
+            </select>
         </div>
-        {{end}}
-        {{if eq (len .Moments) 0}}<div class="bg-white rounded-2xl p-12 shadow-xs border border-gray-100/50 text-center text-sm text-gray-400">暂无瞬间</div>{{end}}
+        <!-- Table -->
+        <div class="overflow-x-auto">
+            <table class="w-full text-sm">
+                <thead class="bg-gray-50/50 text-xs text-gray-400">
+                    <tr><th class="text-left px-5 py-3">ID</th><th class="text-left px-5 py-3">内容</th><th class="text-left px-5 py-3">媒体</th><th class="text-left px-5 py-3">状态</th><th class="text-left px-5 py-3">点赞</th><th class="text-left px-5 py-3">发布时间</th><th class="text-left px-5 py-3">操作</th></tr>
+                </thead>
+                <tbody class="divide-y divide-gray-50">
+                    {{range .Moments}}
+                    <tr class="hover:bg-gray-50/50 transition">
+                        <td class="px-5 py-3 text-xs text-gray-400">{{.ID}}</td>
+                        <td class="px-5 py-3 text-gray-700 max-w-[300px] line-clamp-2">{{.Content}}</td>
+                        <td class="px-5 py-3 text-xs text-gray-500">{{if .MediaCount}}{{.MediaCount}} 个文件{{else}}<span class="text-gray-300">-</span>{{end}}</td>
+                        <td class="px-5 py-3">
+                            {{if eq .Status "published"}}<span class="text-[10px] bg-green-50 text-green-600 px-2 py-0.5 rounded-full font-medium">已发布</span>
+                            {{else if eq .Status "draft"}}<span class="text-[10px] bg-gray-100 text-gray-500 px-2 py-0.5 rounded-full font-medium">草稿</span>
+                            {{else}}<span class="text-[10px] bg-amber-50 text-amber-600 px-2 py-0.5 rounded-full font-medium">定时</span>{{end}}
+                        </td>
+                        <td class="px-5 py-3 text-xs text-gray-400">{{.Likes}}</td>
+                        <td class="px-5 py-3 text-xs text-gray-400">{{formatTime .CreatedAt}}</td>
+                        <td class="px-5 py-3">
+                            <div class="flex items-center space-x-2">
+                                <a href="/admin/moments/edit/{{.ID}}" class="text-xs text-indigo-500 hover:text-indigo-700"><i class="fa-solid fa-pen-to-square"></i></a>
+                                <button onclick="confirmAction('确定删除此瞬间？', '/admin/moments/delete/{{.ID}}')" class="text-xs text-red-400 hover:text-red-600"><i class="fa-solid fa-trash"></i></button>
+                            </div>
+                        </td>
+                    </tr>
+                    {{end}}
+                </tbody>
+            </table>
+        </div>
+        {{if eq (len .Moments) 0}}<div class="text-center py-12 text-sm text-gray-400">暂无瞬间</div>{{end}}
     </div>
 
 {{else}}
@@ -33,19 +60,30 @@
     </div>
 
     <form method="POST" id="moment-form" data-no-toast action="{{if eq .Mode "create"}}/admin/moments/create{{else}}/admin/moments/edit/{{.Moment.ID}}{{end}}" enctype="multipart/form-data" class="space-y-4">
+        <input type="hidden" name="status" id="moment-status" value="{{if eq .Mode "create"}}published{{else if eq .Moment.Status "draft"}}published{{else}}{{.Moment.Status}}{{end}}">
         <div class="bg-white rounded-2xl p-6 shadow-xs border border-gray-100/50 space-y-4">
             <div>
                 <label class="text-xs font-medium text-gray-500 mb-1 block">瞬间内容</label>
                 <textarea name="content" rows="4" required placeholder="此刻的想法..." class="w-full border border-gray-200 rounded-xl px-4 py-2.5 text-sm outline-none focus:ring-2 focus:ring-indigo-200 focus:border-indigo-400 resize-none">{{.Moment.Content}}</textarea>
             </div>
-            <div>
-                <label class="text-xs font-medium text-gray-500 mb-1 block">发布时间</label>
-                <input type="datetime-local" name="created_at" {{if gt (.Moment.CreatedAt.Year) 1}}value="{{formatDatetimeLocal .Moment.CreatedAt}}"{{end}} class="w-full border border-gray-200 rounded-xl px-4 py-2.5 text-sm outline-none focus:ring-2 focus:ring-indigo-200 focus:border-indigo-400">
-                <p class="text-[10px] text-gray-400 mt-1">留空则使用当前时间</p>
+            <div class="grid grid-cols-2 gap-4">
+                <div>
+                    <label class="text-xs font-medium text-gray-500 mb-1 block">发布时间</label>
+                    <input type="datetime-local" name="created_at" id="moment-created-at" {{if gt (.Moment.CreatedAt.Year) 1}}value="{{formatDatetimeLocal .Moment.CreatedAt}}"{{end}} class="w-full border border-gray-200 rounded-xl px-4 py-2.5 text-sm outline-none focus:ring-2 focus:ring-indigo-200 focus:border-indigo-400">
+                    <p class="text-[10px] text-gray-400 mt-1">留空则使用当前时间</p>
+                </div>
+                <div>
+                    <label class="text-xs font-medium text-gray-500 mb-1 block">定时发布</label>
+                    <input type="datetime-local" name="publish_at" id="moment-publish-at" class="w-full border border-gray-200 rounded-xl px-4 py-2.5 text-sm outline-none focus:ring-2 focus:ring-indigo-200 focus:border-indigo-400">
+                    <p class="text-[10px] text-gray-400 mt-1">设置未来时间则定时发布</p>
+                </div>
             </div>
             <div>
                 <label class="text-xs font-medium text-gray-500 mb-1 block">上传图片/视频（支持多选）</label>
-                <input type="file" name="media" id="moment-media-input" multiple accept="image/*,video/*" onchange="previewMomentMedia(this)" class="text-xs text-gray-500 file:mr-2 file:py-1.5 file:px-3 file:rounded-lg file:border-0 file:bg-indigo-50 file:text-indigo-600 file:text-xs file:font-medium file:cursor-pointer">
+                <div class="flex items-center gap-2">
+                    <input type="file" name="media" id="moment-media-input" multiple accept="image/*,video/*" onchange="previewMomentMedia(this)" class="text-xs text-gray-500 file:mr-2 file:py-1.5 file:px-3 file:rounded-lg file:border-0 file:bg-indigo-50 file:text-indigo-600 file:text-xs file:font-medium file:cursor-pointer flex-1">
+                    <button type="button" onclick="openMomentMediaPicker()" class="shrink-0 text-xs px-3 py-2 rounded-lg bg-gray-100 text-gray-600 hover:bg-indigo-50 hover:text-indigo-600 transition font-medium whitespace-nowrap"><i class="fa-solid fa-images mr-1"></i>从媒体库选择</button>
+                </div>
                 <div id="moment-media-preview" class="flex flex-wrap gap-2 mt-3"></div>
                 {{if .Moment.MediaURLs}}
                 <div class="flex flex-wrap gap-2 mt-3" id="existing-media">
@@ -64,17 +102,37 @@
                 <input type="hidden" name="deleted_media" id="deleted-media-input" value="">
             </div>
         </div>
-        <div class="flex justify-end">
+        <div class="flex justify-end gap-2">
+            <button type="button" onclick="saveMomentDraft()" class="bg-gray-100 text-gray-600 text-sm px-6 py-2.5 rounded-xl font-medium hover:bg-gray-200 transition">
+                <i class="fa-regular fa-save mr-1"></i> 保存草稿
+            </button>
             <button type="submit" class="bg-indigo-600 text-white text-sm px-6 py-2.5 rounded-xl font-medium hover:bg-indigo-700 transition shadow-xs shadow-indigo-100">
                 <i class="fa-solid fa-paper-plane mr-1"></i> 提交
             </button>
         </div>
     </form>
+
+    <!-- ====== 媒体库选择弹窗 ====== -->
+    <div id="media-picker-overlay" class="fixed inset-0 bg-black/40 z-50 hidden flex items-center justify-center" onclick="closeMomentMediaPicker(event)">
+        <div class="bg-white rounded-2xl shadow-2xl w-full max-w-3xl max-h-[80vh] flex flex-col m-4" onclick="event.stopPropagation()">
+            <div class="flex items-center justify-between p-4 border-b border-gray-100">
+                <div class="flex items-center gap-2">
+                    <h3 class="text-sm font-bold text-gray-700">选择媒体</h3>
+                    <div class="flex bg-gray-100 rounded-lg p-0.5">
+                        <button class="moment-picker-tab px-3 py-1 text-xs rounded-md transition active bg-white shadow-xs text-gray-700" data-type="photos" onclick="switchMomentPickerTab('photos', this)">图片</button>
+                        <button class="moment-picker-tab px-3 py-1 text-xs rounded-md transition text-gray-400" data-type="videos" onclick="switchMomentPickerTab('videos', this)">视频</button>
+                    </div>
+                </div>
+                <button onclick="closeMomentMediaPickerDirect()" class="text-gray-400 hover:text-gray-600 text-lg leading-none">&times;</button>
+            </div>
+            <div id="moment-picker-grid" class="grid grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-3 p-4 overflow-y-auto flex-1">
+                <div class="col-span-full text-center py-8 text-sm text-gray-400">加载中...</div>
+            </div>
+        </div>
+    </div>
+
     <script>
         var momentMediaFiles = [];
-
-        // 页面加载时：把已存在的预览文件同步到 momentMediaFiles
-        // （编辑模式下现有图片不需要加入，仅新增的才需要走这里）
 
         function previewMomentMedia(input) {
             var preview = document.getElementById('moment-media-preview');
@@ -86,7 +144,6 @@
                 }
             }
             renderPreviews();
-            // 重置 input，这样同文件再次选择时仍能触发 onchange
             input.value = '';
         }
 
@@ -127,7 +184,6 @@
             renderPreviews();
         }
 
-        // 删除已有媒体（编辑模式）
         function removeExistingMedia(btn) {
             var item = btn.closest('.existing-media-item');
             var url = item.getAttribute('data-url');
@@ -140,18 +196,53 @@
             item.remove();
         }
 
-        // 拦截表单提交：用 FormData 手工附加所有 momentMediaFiles，避免 input.files 只读导致丢文件
+        // 保存草稿
+        function saveMomentDraft() {
+            var form = document.getElementById('moment-form');
+            document.getElementById('moment-status').value = 'draft';
+            var fd = new FormData(form);
+            fd.delete('media');
+            for (var i = 0; i < momentMediaFiles.length; i++) {
+                fd.append('media', momentMediaFiles[i]);
+            }
+            var btn = form.querySelector('.flex.justify-end button:first-child');
+            var origHTML = btn.innerHTML;
+            btn.disabled = true;
+            btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin mr-1"></i> 保存中...';
+            fetch(form.action, { method: 'POST', body: fd, credentials: 'same-origin', headers: {'X-Requested-With': 'fetch'} })
+                .then(function(res) {
+                    if (res.redirected || res.status === 302 || res.status === 200) {
+                        showToast('草稿已保存', 'success');
+                        setTimeout(function() { window.location.href = '/admin/moments?status=draft'; }, 600);
+                    } else {
+                        showToast('保存失败', 'error');
+                        btn.disabled = false; btn.innerHTML = origHTML;
+                    }
+                })
+                .catch(function() {
+                    showToast('请求失败', 'error');
+                    btn.disabled = false; btn.innerHTML = origHTML;
+                });
+        }
+
+        // 拦截表单提交
         (function() {
             var form = document.getElementById('moment-form');
             if (!form) return;
             form.addEventListener('submit', function(e) {
                 e.preventDefault();
                 var fd = new FormData(form);
-                // 清空默认的 media 字段（可能只含最后一次选择的文件）
                 fd.delete('media');
-                // 逐个添加所有选中文件，形成多个 "media" 字段
                 for (var i = 0; i < momentMediaFiles.length; i++) {
                     fd.append('media', momentMediaFiles[i]);
+                }
+                // 定时发布逻辑
+                var publishAt = fd.get('publish_at');
+                if (publishAt && fd.get('status') !== 'draft') {
+                    var scheduledTime = new Date(publishAt);
+                    if (scheduledTime > new Date()) {
+                        fd.set('status', 'scheduled');
+                    }
                 }
                 var method = form.method.toUpperCase();
                 var action = form.action;
@@ -164,8 +255,8 @@
                 fetch(action, { method: method, body: fd, credentials: 'same-origin', headers: {'X-Requested-With': 'fetch'} })
                     .then(function(res) {
                         if (res.redirected || res.status === 302 || res.status === 200) {
-                            var isEdit = action.includes('/edit/');
-                            showToast(isEdit ? '瞬间已更新' : '瞬间已发布', 'success');
+                            var isDraft = fd.get('status') === 'draft';
+                            showToast(isDraft ? '草稿已保存' : '瞬间已发布', 'success');
                             setTimeout(function() { window.location.href = res.url || '/admin/moments'; }, 600);
                         } else {
                             showToast('提交失败', 'error');
@@ -192,6 +283,91 @@
                 input.value = y+'-'+m+'-'+d+'T'+h+':'+min;
             }
         })();
+
+        // ====== 媒体库选择弹窗逻辑 ======
+        var _momentPickerType = 'photos';
+
+        function openMomentMediaPicker() {
+            _momentPickerType = 'photos';
+            document.getElementById('media-picker-overlay').classList.remove('hidden');
+            document.getElementById('media-picker-overlay').classList.add('flex');
+            document.querySelectorAll('.moment-picker-tab').forEach(function(t) {
+                t.classList.toggle('active', t.dataset.type === 'photos');
+                t.classList.toggle('bg-white', t.dataset.type === 'photos');
+                t.classList.toggle('shadow-xs', t.dataset.type === 'photos');
+                t.classList.toggle('text-gray-700', t.dataset.type === 'photos');
+                t.classList.toggle('text-gray-400', t.dataset.type !== 'photos');
+            });
+            loadMomentMedia('photos');
+        }
+
+        function closeMomentMediaPicker(e) {
+            if (e && e.target !== document.getElementById('media-picker-overlay')) return;
+            closeMomentMediaPickerDirect();
+        }
+
+        function closeMomentMediaPickerDirect() {
+            document.getElementById('media-picker-overlay').classList.add('hidden');
+            document.getElementById('media-picker-overlay').classList.remove('flex');
+        }
+
+        function switchMomentPickerTab(type, btn) {
+            document.querySelectorAll('.moment-picker-tab').forEach(function(t) {
+                t.classList.remove('active', 'bg-white', 'shadow-xs', 'text-gray-700');
+                t.classList.add('text-gray-400');
+            });
+            btn.classList.add('active', 'bg-white', 'shadow-xs', 'text-gray-700');
+            btn.classList.remove('text-gray-400');
+            loadMomentMedia(type);
+        }
+
+        function loadMomentMedia(type) {
+            var grid = document.getElementById('moment-picker-grid');
+            grid.innerHTML = '<div class="col-span-full text-center py-8 text-sm text-gray-400">加载中...</div>';
+            fetch('/admin/media/api?type=' + type, { credentials: 'same-origin', headers: {'X-Requested-With': 'fetch'} })
+                .then(function(r) { return r.json(); })
+                .then(function(res) {
+                    if (!res.ok || !res.files || res.files.length === 0) {
+                        grid.innerHTML = '<div class="col-span-full text-center py-8 text-sm text-gray-400">暂无文件</div>';
+                        return;
+                    }
+                    var html = '';
+                    for (var i = 0; i < res.files.length; i++) {
+                        var f = res.files[i];
+                        html += '<div class="aspect-square bg-gray-100 rounded-xl overflow-hidden cursor-pointer border-2 border-transparent hover:border-indigo-400 transition relative group" data-url="' + f.url + '" data-name="' + f.name + '" onclick="selectMomentMedia(this)">';
+                        if (type === 'photos') {
+                            html += '<img loading="lazy" src="' + f.url + '" class="w-full h-full object-cover">';
+                        } else {
+                            html += '<video src="' + f.url + '" class="w-full h-full object-cover" preload="metadata"></video>';
+                            html += '<div class="absolute inset-0 flex items-center justify-center"><div class="w-8 h-8 rounded-full bg-black/40 flex items-center justify-center"><i class="fa-solid fa-play text-white text-xs"></i></div></div>';
+                        }
+                        html += '<div class="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/50 to-transparent p-2 opacity-0 group-hover:opacity-100 transition"><p class="text-[10px] text-white line-clamp-1">' + f.name + '</p></div>';
+                        html += '<div class="absolute top-2 right-2 w-6 h-6 rounded-full bg-indigo-500 text-white text-[10px] flex items-center justify-center opacity-0 group-hover:opacity-100 transition"><i class="fa-solid fa-check"></i></div>';
+                        html += '</div>';
+                    }
+                    grid.innerHTML = html;
+                })
+                .catch(function() {
+                    grid.innerHTML = '<div class="col-span-full text-center py-8 text-sm text-red-400">加载失败，请重试</div>';
+                });
+        }
+
+        function selectMomentMedia(el) {
+            var url = el.dataset.url;
+            var name = el.dataset.name;
+            closeMomentMediaPickerDirect();
+            fetch(url, { credentials: 'same-origin' })
+                .then(function(r) { return r.blob(); })
+                .then(function(blob) {
+                    var file = new File([blob], name, { type: blob.type });
+                    momentMediaFiles.push(file);
+                    renderPreviews();
+                    showToast('已从媒体库添加: ' + name, 'success');
+                })
+                .catch(function() {
+                    showToast('添加失败，请重试', 'error');
+                });
+        }
     </script>
 {{end}}
 
