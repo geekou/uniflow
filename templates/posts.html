@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <link rel="alternate" type="application/rss+xml" title="{{.SiteTitle}} RSS" href="/rss">
-    <title>文章列表 - {{.SiteTitle}}</title>
+    <title>瞬间 - {{.SiteTitle}}</title>
     <link href="/static/css/dark.css" rel="stylesheet">
     <link href="/static/css/tailwind.css" rel="stylesheet">
     <link href="/static/css/article-components.css" rel="stylesheet">
@@ -17,6 +17,7 @@
         .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
         .line-clamp-2 { display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
         .line-clamp-1 { display: -webkit-box; -webkit-line-clamp: 1; -webkit-box-orient: vertical; overflow: hidden; }
+        .liked { color: #ef4444 !important; }
         @media (min-width: 768px) {
             .tri-scroll-layout { align-items: start; }
             .tri-scroll-column {
@@ -28,15 +29,16 @@
             }
             .tri-scroll-column::-webkit-scrollbar { display: none; }
             #sidebar.tri-scroll-column,
-            main.tri-scroll-column { position: sticky; top: 1.5rem; }
+            #sidebar.tri-scroll-column,
+            main.tri-scroll-column,
+            aside.tri-scroll-column { position: sticky; top: 1.5rem; }
         }
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: translateY(0); } }
         #back-to-top{position:fixed;bottom:2rem;right:2rem;z-index:50;width:2.5rem;height:2.5rem;border-radius:50%;background:rgba(99,102,241,0.85);color:#fff;display:flex;align-items:center;justify-content:center;font-size:1.1rem;opacity:0;visibility:hidden;transform:translateY(10px);transition:all 0.3s ease;box-shadow:0 4px 12px rgba(99,102,241,0.3);cursor:pointer}
         #back-to-top.show{opacity:1;visibility:visible;transform:translateY(0)}
         #back-to-top:hover{background:rgba(79,70,229,1);transform:translateY(-2px)}
         input:focus, textarea:focus { outline: none; }
         .input-glow:focus { box-shadow: 0 0 0 3px rgba(99,102,241,0.15); border-color: #818cf8; }
-        .card-hover { transition: all 0.2s ease; }
-        .card-hover:hover { transform: translateY(-2px); box-shadow: 0 8px 25px rgba(0,0,0,0.06); }
     </style>
 </head>
 <body class="bg-[#F4F6F9] text-gray-800 min-h-screen">
@@ -209,6 +211,285 @@
     <script>
         const lightbox = GLightbox({ selector: '.glightbox', touchNavigation: true, loop: true, autoplayVideos: true });
 
+        function escapeHtml(value) {
+            return String(value || '').replace(/[&<>"']/g, function(ch) {
+                return ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'})[ch];
+            });
+        }
+
+        function safeUrl(value) {
+            var raw = String(value || '').trim();
+            if (!raw || /[\u0000\r\n\t]/.test(raw) || raw.indexOf('//') === 0) return '';
+            if (raw.charAt(0) === '/') return raw;
+            try {
+                var url = new URL(raw, window.location.origin);
+                if ((url.protocol === 'http:' || url.protocol === 'https:') && raw.indexOf(':') > -1) return raw;
+                if (raw.indexOf(':') === -1 && raw.indexOf('.') !== 0) return raw;
+            } catch (e) {}
+            return '';
+        }
+
+        function likeMoment(id, btn) {
+            var icon = btn.querySelector('i');
+            var countEl = btn.querySelector('.like-count');
+
+            fetch('/api/moment/like/' + id, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' }
+            })
+            .then(function(res) { return res.json(); })
+            .then(function(data) {
+                if (data.ok) {
+                    countEl.textContent = data.likes;
+                    var liked = getLikedMoments();
+                    if (data.liked) {
+                        btn.classList.add('liked');
+                        icon.classList.remove('fa-regular');
+                        icon.classList.add('fa-solid');
+                        if (liked.indexOf(id) === -1) liked.push(id);
+                    } else {
+                        btn.classList.remove('liked');
+                        icon.classList.remove('fa-solid');
+                        icon.classList.add('fa-regular');
+                        liked = liked.filter(function(lid) { return lid !== id; });
+                    }
+                    localStorage.setItem('liked_moments', JSON.stringify(liked));
+                }
+            })
+            .catch(function() {});
+        }
+
+        // 缓存登录状态
+        var _authLoggedIn = null;
+
+        // 页面加载时立即预填所有昵称输入框
+        (function() {
+            var nick = getCookie('_nick');
+            if (nick) {
+                document.querySelectorAll('[id^="comment-author-"]').forEach(function(el) {
+                    el.value = nick;
+                });
+            }
+        })();
+        function checkAuth(callback) {
+            if (_authLoggedIn !== null) { callback(_authLoggedIn); return; }
+            fetch('/api/auth/check').then(r => r.json()).then(data => {
+                _authLoggedIn = data.loggedIn || false;
+                callback(_authLoggedIn);
+            }).catch(() => { _authLoggedIn = false; callback(false); });
+        }
+
+        function toggleMomentComment(btn, id) {
+            var box = btn.closest('.moment-card, .flex-1').querySelector('.moment-comment-box');
+            if (!box) return;
+            box.classList.toggle('hidden');
+            if (!box.classList.contains('hidden')) {
+                // 检查登录状态，控制昵称输入框显隐
+                checkAuth(function(loggedIn) {
+                    var authorRow = document.getElementById('comment-author-row-' + id);
+                    if (authorRow) {
+                        authorRow.classList.toggle('hidden', loggedIn);
+                        if (!loggedIn) {
+                            var nick = getCookie('_nick');
+                            if (nick) document.getElementById('comment-author-' + id).value = nick;
+                        }
+                    }
+                    var imgBtn = document.getElementById('moment-image-btn-' + id);
+                    if (imgBtn) {
+                        imgBtn.classList.toggle('hidden', !loggedIn);
+                    }
+                });
+                var ta = box.querySelector('textarea');
+                if (ta) ta.focus();
+            }
+        }
+
+        function toggleMomentEmoji(btn) {
+            var picker = btn.closest('.bg-gray-50').querySelector('.moment-emoji-picker');
+            if (picker) picker.classList.toggle('hidden');
+        }
+
+        function previewMomentImage(input, id) {
+            var preview = document.getElementById('moment-image-preview-' + id);
+            var img = document.getElementById('moment-image-preview-img-' + id);
+            if (input.files && input.files[0]) {
+                img.src = URL.createObjectURL(input.files[0]);
+                preview.style.display = 'inline-block';
+            }
+        }
+        function clearMomentImage(id) {
+            var preview = document.getElementById('moment-image-preview-' + id);
+            var input = preview ? preview.parentElement.previousElementSibling.querySelector('input[type=file]') : null;
+            if (!input) {
+                var btn = document.getElementById('moment-image-btn-' + id);
+                if (btn) input = btn.querySelector('input[type=file]');
+            }
+            if (input) input.value = '';
+            if (preview) preview.style.display = 'none';
+        }
+
+        function insertMomentEmoji(btn, emoji) {
+            var box = btn.closest('.moment-comment-box');
+            var ta = box.querySelector('.moment-comment-input');
+            var start = ta.selectionStart;
+            var end = ta.selectionEnd;
+            ta.value = ta.value.substring(0, start) + emoji + ta.value.substring(end);
+            ta.selectionStart = ta.selectionEnd = start + emoji.length;
+            ta.focus();
+        }
+
+        function submitMomentComment(btn, momentId) {
+            var box = btn.closest('.moment-comment-box');
+            var textarea = box.querySelector('.moment-comment-input');
+            var content = textarea.value.trim();
+            if (!content) return;
+
+            var fd = new FormData();
+            fd.append('target_type', 'moment');
+            fd.append('target_id', momentId);
+            fd.append('content', content);
+
+            // 回复时附上 parent_id 和 reply_to
+            var parentId = document.getElementById('comment-parent-' + momentId);
+            var replyTo = document.getElementById('comment-replyto-' + momentId);
+            if (parentId && parentId.value != '0') {
+                fd.append('parent_id', parentId.value);
+                fd.append('reply_to', replyTo ? replyTo.value : '');
+            }
+
+            // 未登录时附上昵称
+            var authorInput = document.getElementById('comment-author-' + momentId);
+            if (authorInput && !authorInput.closest('.hidden')) {
+                var author = authorInput.value.trim();
+                if (!author) { showToast('请输入昵称', 'error'); return; }
+                var authorLen = [...author].length;
+                if (authorLen < 3 || authorLen > 10) { showToast('昵称需要 3-10 个字', 'error'); return; }
+                fd.append('author', author);
+            }
+
+            // 登录用户附上图片（通过按钮可见性判断，不依赖异步状态）
+            var imgBtn = document.getElementById('moment-image-btn-' + momentId);
+            if (imgBtn && !imgBtn.classList.contains('hidden')) {
+                var imgInput = imgBtn.querySelector('input[type=file]');
+                if (imgInput && imgInput.files.length > 0) {
+                    fd.append('image', imgInput.files[0]);
+                }
+            }
+
+            btn.textContent = '提交中...';
+            btn.disabled = true;
+            fetch('/api/comment', {
+                method: 'POST',
+                body: fd
+            })
+            .then(function(res) { return res.json(); })
+            .then(function(data) {
+                if (data.ok) {
+                    // 插入新评论到列表
+                    var commentList = box.querySelector('.moment-comments-list');
+                    var noComment = box.querySelector('.no-comment-hint');
+                    if (noComment) noComment.remove();
+
+                    var isReply = data.parent_id && data.parent_id != '0';
+                    var commentEl = document.createElement('div');
+                    
+                    if (isReply) {
+                        // 子回复：同级插入
+                        var parentBtn = document.querySelector('.comment-like-btn[data-cid="' + data.parent_id + '"]');
+                        var authorName = data.author || '匿名';
+                        var safeAuthorName = escapeHtml(authorName);
+                        var replyToHtml = data.reply_to ? '<span class="text-indigo-400 font-medium">回复 ' + escapeHtml(data.reply_to) + '</span> ' : '';
+                        commentEl.className = 'mt-2.5 ml-5 pl-3 border-l-[3px] border-indigo-200/50 bg-gradient-to-r from-indigo-50/20 to-transparent rounded-r-lg py-2 pr-3';
+                        commentEl.innerHTML = '<div class="flex items-center gap-1.5"><span class="w-5 h-5 rounded-full bg-indigo-100 flex items-center justify-center text-[9px] font-bold text-indigo-500 shrink-0">' + escapeHtml(authorName.charAt(0)) + '</span><span class="text-xs font-semibold text-gray-700">' + safeAuthorName + '</span><span class="text-[10px] text-gray-400">刚刚</span></div><p class="text-xs text-gray-600 mt-1 pl-[26px]">' + replyToHtml + escapeHtml(content) + '</p><div class="flex items-center gap-3 mt-1 pl-[26px]"><button onclick="toggleCommentLike(this, ' + data.id + ')" class="comment-like-btn flex items-center gap-1 text-[10px] text-gray-400 hover:text-rose-500 transition" data-cid="' + data.id + '"><i class="fa-regular fa-heart"></i><span class="like-count"></span></button><button onclick="replyToComment(' + data.id + ', \'' + escapeHtml(authorName) + '\', ' + (data.parent_id || data.id) + ')" class="flex items-center gap-1 text-[10px] text-gray-400 hover:text-indigo-500 transition"><i class="fa-regular fa-comment-dots"></i>回复</button></div>';
+                        if (parentBtn) {
+                            var container = parentBtn.closest('[class*="border-l-"]');
+                            if (container) {
+                                container.insertAdjacentElement('afterend', commentEl);
+                            }
+                        }
+                    } else {
+                        // 顶级评论
+                        var authorName = data.author || '匿名';
+                        var safeAuthorName = escapeHtml(authorName);
+                        var authorAvatar = safeUrl(data.author_avatar || '');
+                        var avatarHtml = authorAvatar
+                            ? '<img loading="lazy" src="' + escapeHtml(authorAvatar) + '" class="w-8 h-8 rounded-full object-cover shrink-0">'
+                            : '<div class="w-8 h-8 rounded-full bg-gradient-to-br from-indigo-400 to-purple-500 flex items-center justify-center text-white text-xs font-bold shrink-0">' + escapeHtml(authorName.charAt(0)) + '</div>';
+                        var safeImageUrl = safeUrl(data.image_url || '');
+                        var imgHtml = safeImageUrl ? '<img loading="lazy" src="' + escapeHtml(safeImageUrl) + '" class="mt-2 max-h-32 rounded-lg border border-gray-200">' : '';
+                        commentEl.className = 'flex gap-3 p-3 bg-gray-50 rounded-xl';
+                        commentEl.style.animation = 'fadeIn 0.3s ease';
+                        commentEl.innerHTML = avatarHtml + '<div class="flex-1 min-w-0"><div class="flex items-center gap-2"><span class="text-sm font-semibold text-gray-900">' + safeAuthorName + '</span><span class="text-xs text-gray-400">刚刚</span></div><p class="text-sm text-gray-600 mt-1">' + escapeHtml(content) + '</p>' + imgHtml + '<div class="flex items-center gap-3 mt-1.5"><button onclick="toggleCommentLike(this, ' + data.id + ')" class="comment-like-btn flex items-center gap-1 text-[11px] text-gray-400 hover:text-rose-500 transition" data-cid="' + data.id + '"><i class="fa-regular fa-heart"></i><span class="like-count"></span></button><button onclick="replyToComment(' + data.id + ', \'' + escapeHtml(authorName) + '\')" class="flex items-center gap-1 text-[11px] text-gray-400 hover:text-indigo-500 transition"><i class="fa-regular fa-comment-dots"></i>回复</button></div></div>';
+                    }
+
+                    if (!commentList && !isReply) {
+                        commentList = document.createElement('div');
+                        commentList.className = 'comment-scroll-box moment-comments-list space-y-3 max-h-[16rem] overflow-y-auto pr-1 mb-4';
+                        var formArea = box.querySelector('.bg-gray-50');
+                        box.insertBefore(commentList, formArea);
+                    }
+                    if (commentList && !isReply) commentList.insertBefore(commentEl, commentList.firstChild);
+
+                    // 更新评论数
+                    var commentBtn = box.parentElement.querySelector('.fa-comment').parentElement;
+                    var countSpan = commentBtn.querySelector('span');
+                    var currentCount = parseInt(countSpan.textContent) || 0;
+                    countSpan.textContent = currentCount + 1;
+
+                    // 清空表单
+                    textarea.value = '';
+                    // 记住昵称
+                    var authorInput = document.getElementById('comment-author-' + momentId);
+                    if (authorInput && !authorInput.closest('.hidden') && authorInput.value.trim()) {
+                        setCookie('_nick', authorInput.value.trim(), 365);
+                    }
+                    cancelMomentReply(momentId);
+                    // 恢复昵称
+                    var nick = getCookie('_nick');
+                    if (nick && authorInput && !authorInput.closest('.hidden')) authorInput.value = nick;
+                    showToast('评论已发送', 'success');
+                } else if (data.msg === '请先登录') {
+                    showToast('请先登录后再评论', 'error');
+                } else {
+                    showToast(data.msg || '评论失败', 'error');
+                }
+            })
+            .catch(function() { showToast('网络错误', 'error'); })
+            .finally(function() {
+                btn.textContent = '提交评论';
+                btn.disabled = false;
+            });
+        }
+
+        function shareMoment(id) {
+            var url = location.origin + '/moments#moment-' + id;
+            if (navigator.share) {
+                navigator.share({ title: document.title, url: url }).catch(function(){});
+            } else {
+                navigator.clipboard.writeText(url).then(function() {
+                    showToast('链接已复制', 'success');
+                }).catch(function() {
+                    var ta = document.createElement('textarea');
+                    ta.value = url; document.body.appendChild(ta);
+                    ta.select(); document.execCommand('copy');
+                    document.body.removeChild(ta);
+                    showToast('链接已复制', 'success');
+                });
+            }
+        }
+
+        function showToast(msg, type) {
+            var toast = document.createElement('div');
+            var bg = type === 'success' ? '#10b981' : type === 'error' ? '#ef4444' : '#6b7280';
+            toast.style.cssText = 'position:fixed;top:1.5rem;right:1.5rem;padding:0.6rem 1.2rem;background:'+bg+';color:#fff;border-radius:0.75rem;font-size:13px;z-index:9999;box-shadow:0 4px 16px rgba(0,0,0,0.15);transition:opacity 0.4s;animation:fadeInUp 0.3s ease';
+            toast.textContent = msg;
+            document.body.appendChild(toast);
+            setTimeout(function() { toast.style.opacity = '0'; setTimeout(function() { toast.remove(); }, 400); }, 2000);
+        }
+
+        // 导航高亮
+        (function(){var p=location.pathname;document.querySelectorAll('nav a').forEach(function(a){var h=a.getAttribute('href');if(h===p||(p!=='/'&&h!=='/'&&p.startsWith(h))){a.classList.add('text-indigo-600','font-semibold');}});})();
+
         // ====== GitHub 风格热力图 ======
         (function() {
             var heatmapType = 'posts';
@@ -266,7 +547,6 @@
 
             // 先从 sessionStorage 恢复（跨页面无闪烁）
             var cached = sessionStorage.getItem(cacheKey);
-            // 当前 key 没有缓存时，尝试其他热力图数据作为兜底
             if (!cached) {
                 var fallbackKeys = ['heatmap_all', 'heatmap_moments', 'heatmap_posts'];
                 for (var i = 0; i < fallbackKeys.length; i++) {
@@ -287,9 +567,8 @@
                 .then(function(r) { return r.json(); })
                 .then(function(res) {
                     if (!res.ok) return;
-                    var data = res.data, map = {}, total = 0, active = 0;
+                    var data = res.data, total = 0, active = 0;
                     for (var i = 0; i < data.length; i++) { total += data[i].count; if (data[i].count > 0) active++; }
-                    // 缓存到 sessionStorage
                     try { sessionStorage.setItem(cacheKey, JSON.stringify({data: data, total: total, active: active})); } catch(e) {}
                     renderHeatmap(data, total, active);
                 })
@@ -301,7 +580,7 @@
 
         // 三栏同步滚轮：到边界的栏停止，未到边界的栏继续
         (function() {
-            var media = window.matchMedia('(min-width: 1024px)');
+            var media = window.matchMedia('(min-width: 768px)');
             var active = false;
 
             function getColumns() {
@@ -368,7 +647,106 @@
             refresh();
             if (media.addEventListener) media.addEventListener('change', refresh);
             else media.addListener(refresh);
-        })();{{template "partials/footer-scripts" .}}
+        })();        // 评论区独立滚动——鼠标悬停时只滚动评论，不穿透到父容器
+        (function() {
+            var boxes = document.querySelectorAll('.comment-scroll-box');
+            var main = document.querySelector('main.tri-scroll-column');
+            if (!boxes.length || !main) return;
+            
+            var currentBox = null;
+            boxes.forEach(function(box) {
+                box.addEventListener('mouseenter', function() { currentBox = box; });
+                box.addEventListener('mouseleave', function() { currentBox = null; });
+            });
+            
+            // 在 main 层统一接管：鼠标在评论框内 → 只滚评论；否则 → 正常滚 main
+            main.addEventListener('wheel', function(e) {
+                if (!currentBox) return;
+                e.preventDefault();
+                e.stopPropagation();
+                currentBox.scrollTop += e.deltaY;
+            }, { passive: false });
+        })();
+        
+        // 评论点赞
+        async function toggleCommentLike(btn, cid) {
+            var resp = await fetch('/api/comment/like', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({comment_id: cid})
+            });
+            var data = await resp.json();
+            if (!data.ok) return;
+            var icon = btn.querySelector('i');
+            var countEl = btn.querySelector('.like-count');
+            if (data.liked) {
+                icon.className = 'fa-solid fa-heart text-rose-500';
+            } else {
+                icon.className = 'fa-regular fa-heart';
+            }
+            countEl.textContent = data.likes > 0 ? data.likes : '';
+        }
+        
+        // 回复评论
+        function replyToComment(cid, author, actualParentId) {
+            // 找到当前瞬间的评论表单
+            var box = event.target.closest('.moment-comment-box');
+            if (!box) return;
+            var form = box.querySelector('[id^="comment-form-"]');
+            if (form) {
+                var mid = form.id.replace('comment-form-', '');
+                // 子回复：使用上级评论ID作为parent_id，保持同级
+                document.getElementById('comment-parent-' + mid).value = actualParentId || cid;
+                document.getElementById('comment-replyto-' + mid).value = author;
+                var ind = document.getElementById('reply-indicator-' + mid);
+                var txt = document.getElementById('reply-indicator-text-' + mid);
+                txt.textContent = '回复 ' + author;
+                ind.classList.remove('hidden');
+                var ta = box.querySelector('.moment-comment-input');
+                if (ta) { ta.placeholder = '回复 ' + author + '...'; ta.focus(); }
+            }
+        }
+        
+        function cancelMomentReply(mid) {
+            document.getElementById('comment-parent-' + mid).value = '0';
+            document.getElementById('comment-replyto-' + mid).value = '';
+            document.getElementById('reply-indicator-' + mid).classList.add('hidden');
+            var box = document.getElementById('comment-form-' + mid).closest('.moment-comment-box');
+            if (box) {
+                var ta = box.querySelector('.moment-comment-input');
+                if (ta) ta.placeholder = '说点什么吧，支持表情哦~';
+            }
+        }
+
+        // cookie 工具函数
+        function getCookie(name) {
+            var m = document.cookie.match('(^|;)\\s*' + name + '\\s*=\\s*([^;]+)');
+            return m ? decodeURIComponent(m[2]) : '';
+        }
+        function setCookie(name, value, days) {
+            var d = new Date();
+            d.setTime(d.getTime() + days * 86400000);
+            document.cookie = name + '=' + encodeURIComponent(value) + ';path=/;expires=' + d.toUTCString();
+        }
+
+        // 恢复已点赞状态（等 DOM 就绪）
+        function getLikedMoments() {
+            try { return JSON.parse(localStorage.getItem('liked_moments') || '[]'); } catch(e) { return []; }
+        }
+        document.addEventListener('DOMContentLoaded', function() {
+            var liked = getLikedMoments();
+            var btns = document.querySelectorAll('.like-btn');
+            btns.forEach(function(btn) {
+                var mid = parseInt(btn.getAttribute('data-mid'));
+                if (liked.indexOf(mid) !== -1) {
+                    btn.classList.add('liked');
+                    var icon = btn.querySelector('i');
+                    if (icon) { icon.classList.remove('fa-regular'); icon.classList.add('fa-solid'); }
+                }
+            });
+        });
+    </script>
+{{template "partials/footer-scripts" .}}
 
 </body>
 </html>

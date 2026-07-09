@@ -150,6 +150,7 @@ type IndexData struct {
 	SiteTitle         string
 	SiteSubtitle      string
 	BannerURL         string
+	SiteAuthor        string
 	AboutMe           AboutMe
 	Menus             []models.Menu
 	Stats             SiteStats
@@ -255,6 +256,15 @@ func getSiteSettings(db *sql.DB) (map[string]string, error) {
 		cp[k] = v
 	}
 	return cp, nil
+}
+
+func getAdminDisplayName(db *sql.DB) string {
+	var username string
+	db.QueryRow("SELECT username FROM users WHERE role='admin' LIMIT 1").Scan(&username)
+	if username == "" {
+		username = "HuiNan"
+	}
+	return username
 }
 
 func getAboutMe(settings map[string]string) AboutMe {
@@ -547,13 +557,13 @@ func IndexHandler(db *sql.DB) gin.HandlerFunc {
 		}
 
 		// 瞬间流（最近10条，随机排序）
-		momentRows, _ := db.Query("SELECT id, content, media_urls, likes, created_at FROM moments WHERE status='published' ORDER BY RANDOM() LIMIT 10")
+		momentRows, _ := db.Query("SELECT id, author, content, media_urls, likes, created_at FROM moments WHERE status='published' ORDER BY RANDOM() LIMIT 10")
 		var moments []models.MomentView
 		mediaMap := make(map[string][]string)
 		if momentRows != nil {
 			for momentRows.Next() {
 				var m models.MomentView
-				scanLog(momentRows.Scan(&m.ID, &m.Content, &m.MediaURLs, &m.Likes, &m.CreatedAt), "indexMoments")
+				scanLog(momentRows.Scan(&m.ID, &m.Author, &m.Content, &m.MediaURLs, &m.Likes, &m.CreatedAt), "indexMoments")
 				m.IDStr = strconv.FormatInt(m.ID, 10)
 				if m.MediaURLs != "" {
 					mediaMap[m.IDStr] = strings.Split(m.MediaURLs, ",")
@@ -589,6 +599,7 @@ func IndexHandler(db *sql.DB) gin.HandlerFunc {
 			TotalPages:       totalPages,
 			PageRange:        pageRange,
 			CurrentCategory:  categorySlug,
+SiteAuthor:       getAdminDisplayName(db),
 		}
 
 		c.HTML(http.StatusOK, "index.html", data)
@@ -706,6 +717,7 @@ func PostsListHandler(db *sql.DB) gin.HandlerFunc {
 			PageRange:        pageRange,
 			CurrentCategory:  categorySlug,
 			SearchQuery:      c.Query("q"),
+SiteAuthor:       getAdminDisplayName(db),
 		}
 		c.HTML(http.StatusOK, "posts.html", data)
 	}
@@ -739,7 +751,7 @@ func MomentsListHandler(db *sql.DB) gin.HandlerFunc {
 		}
 		offset = (page - 1) * pageSize
 
-		momentRows, err := db.Query("SELECT id, content, media_urls, likes, created_at FROM moments WHERE status='published' ORDER BY created_at DESC LIMIT ? OFFSET ?", pageSize, offset)
+		momentRows, err := db.Query("SELECT id, author, content, media_urls, likes, created_at FROM moments WHERE status='published' ORDER BY created_at DESC LIMIT ? OFFSET ?", pageSize, offset)
 		if err != nil {
 			c.HTML(http.StatusInternalServerError, "moments.html", gin.H{"error": "查询失败"})
 			return
@@ -749,7 +761,7 @@ func MomentsListHandler(db *sql.DB) gin.HandlerFunc {
 		mediaMap := make(map[string][]string)
 		for momentRows.Next() {
 			var m models.MomentView
-			scanLog(momentRows.Scan(&m.ID, &m.Content, &m.MediaURLs, &m.Likes, &m.CreatedAt), "momentsList")
+			scanLog(momentRows.Scan(&m.ID, &m.Author, &m.Content, &m.MediaURLs, &m.Likes, &m.CreatedAt), "momentsList")
 			m.IDStr = strconv.FormatInt(m.ID, 10)
 			if m.MediaURLs != "" {
 				mediaMap[m.IDStr] = strings.Split(m.MediaURLs, ",")
@@ -825,6 +837,7 @@ func MomentsListHandler(db *sql.DB) gin.HandlerFunc {
 			SiteSubtitle:     settings["site_subtitle"],
 			SiteFoundedAt:    settings["site_founded_at"],
 			SiteNotification: settings["site_notification"],
+			SiteAuthor:       getAdminDisplayName(db),
 			BannerURL:        resolveBannerURL(settings, "banner_url_moments"),
 			AboutMe:          getAboutMe(settings),
 			Menus:            menus,
@@ -1246,11 +1259,11 @@ func SearchHandler(db *sql.DB) gin.HandlerFunc {
 			}
 
 			// 搜索瞬间
-			mRows, mErr := db.Query("SELECT id, content, media_urls, likes, created_at FROM moments WHERE status='published' AND content LIKE ? ORDER BY created_at DESC LIMIT 20", likeQuery)
+			mRows, mErr := db.Query("SELECT id, author, content, media_urls, likes, created_at FROM moments WHERE status='published' AND content LIKE ? ORDER BY created_at DESC LIMIT 20", likeQuery)
 			if mErr == nil && mRows != nil {
 				for mRows.Next() {
 					var m models.MomentView
-					scanLog(mRows.Scan(&m.ID, &m.Content, &m.MediaURLs, &m.Likes, &m.CreatedAt), "searchMoments")
+					scanLog(mRows.Scan(&m.ID, &m.Author, &m.Content, &m.MediaURLs, &m.Likes, &m.CreatedAt), "searchMoments")
 					m.IDStr = strconv.FormatInt(m.ID, 10)
 					moments = append(moments, m)
 				}
@@ -1281,6 +1294,7 @@ func SearchHandler(db *sql.DB) gin.HandlerFunc {
 			Page:             1,
 			TotalPages:       1,
 			PageRange:        []int{1},
+SiteAuthor:       getAdminDisplayName(db),
 		}
 		c.HTML(http.StatusOK, "posts.html", gin.H{
 			"SiteTitle":        data.SiteTitle,
@@ -1339,6 +1353,7 @@ func AboutHandler(db *sql.DB) gin.HandlerFunc {
 			Tags:             tags,
 			HotPosts:         hotPosts,
 			RecentComments:   recentComments,
+SiteAuthor:       getAdminDisplayName(db),
 		}
 		// 额外数据用 gin.H 包装到模板
 		c.HTML(http.StatusOK, "about.html", gin.H{
@@ -1459,6 +1474,7 @@ func GuestbookHandler(db *sql.DB) gin.HandlerFunc {
 			Page:              page,
 			TotalPages:        totalPages,
 			PageRange:         pageRange,
+SiteAuthor:       getAdminDisplayName(db),
 		}
 		c.HTML(http.StatusOK, "guestbook.html", data)
 	}

@@ -1,49 +1,58 @@
 {{template "admin_head" .}}
     <div class="flex items-center justify-between mb-6">
         <h2 class="text-lg font-bold">留言管理</h2>
-        <span class="text-xs text-gray-400">共 {{.Total}} 条留言</span>
     </div>
 
     <div class="bg-white rounded-2xl shadow-xs border border-gray-100/50 overflow-hidden">
-        <table class="w-full text-sm">
-            <thead class="bg-gray-50/50 text-xs text-gray-400">
-                <tr><th class="text-left px-5 py-3">ID</th><th class="text-left px-5 py-3">作者</th><th class="text-left px-5 py-3">内容</th><th class="text-left px-5 py-3">回复</th><th class="text-left px-5 py-3">附图</th><th class="text-left px-5 py-3">时间</th><th class="text-left px-5 py-3">操作</th></tr>
-            </thead>
-            <tbody class="divide-y divide-gray-50">
-                {{range .Guestbooks}}
-                <tr class="hover:bg-gray-50/50 transition">
-                    <td class="px-5 py-3 text-xs text-gray-400">{{.ID}}</td>
-                    <td class="px-5 py-3 text-xs font-medium text-gray-700">{{.Author}}</td>
-                    <td class="px-5 py-3 text-xs text-gray-600 max-w-[250px] line-clamp-2">{{.Content}}</td>
-                    <td class="px-5 py-3 text-xs text-gray-600 max-w-[220px]">
-                        {{if .AdminReply}}
-                        <div class="bg-indigo-50 text-indigo-700 rounded-lg px-2 py-1.5 line-clamp-2">{{.AdminReply}}</div>
-                        {{if .RepliedAt}}<div class="text-[10px] text-gray-400 mt-1">{{.RepliedAt.Format "01-02 15:04"}}</div>{{end}}
-                        {{else}}
-                        <span class="text-gray-300">未回复</span>
-                        {{end}}
-                    </td>
-                    <td class="px-5 py-3">
-                        {{$imageURL := safeURL .ImageURL}}
-                        {{if $imageURL}}<a href="{{$imageURL}}" target="_blank"><img loading="lazy" src="{{$imageURL}}" class="w-10 h-10 rounded-lg object-cover border"></a>{{else}}<span class="text-gray-300 text-xs">-</span>{{end}}
-                    </td>
-                    <td class="px-5 py-3 text-xs text-gray-400">{{formatTime .CreatedAt}}</td>
-                    <td class="px-5 py-3">
-                        <div class="flex items-center space-x-2">
-                            <button onclick="toggleGuestbookReply({{.ID}})" class="text-xs text-green-500 hover:text-green-700" title="回复"><i class="fa-solid fa-reply"></i></button>
-                            <button onclick="confirmAction('确定删除此留言？', '/admin/guestbook/delete/{{.ID}}')" class="text-xs text-red-400 hover:text-red-600" title="删除"><i class="fa-solid fa-trash"></i></button>
-                        </div>
-                        <div id="guestbook-reply-{{.ID}}" class="hidden mt-3">
-                            <form method="POST" action="/admin/guestbook/reply/{{.ID}}" class="flex items-center space-x-2">
-                                <input type="text" name="content" value="{{.AdminReply}}" placeholder="输入回复内容..." required class="flex-1 border border-gray-200 rounded-lg px-2 py-1 text-xs outline-none focus:ring-1 focus:ring-indigo-200">
-                                <button type="submit" class="bg-indigo-600 text-white text-xs px-3 py-1 rounded-lg hover:bg-indigo-700">回复</button>
-                            </form>
-                        </div>
-                    </td>
-                </tr>
-                {{end}}
-            </tbody>
-        </table>
+        <!-- Search -->
+        <div class="p-4 border-b border-gray-50">
+            <form method="GET" action="/admin/guestbook" class="flex items-center bg-gray-50 px-3 py-2 rounded-xl border border-gray-100 max-w-md">
+                <i class="fa-solid fa-magnifying-glass text-gray-400 text-xs mr-2"></i>
+                <input type="text" name="q" placeholder="搜索留言内容、作者或回复..." value="{{.SearchQuery}}" class="bg-transparent text-sm flex-1 outline-none placeholder-gray-400">
+            </form>
+        </div>
+        <!-- Table -->
+        <div class="overflow-x-auto">
+            <table class="w-full text-sm">
+                <thead class="bg-gray-50/50 text-xs text-gray-400">
+                    <tr><th class="text-left px-5 py-3">ID</th><th class="text-left px-5 py-3">作者</th><th class="text-left px-5 py-3">内容</th><th class="text-left px-5 py-3">回复</th><th class="text-left px-5 py-3">附图</th><th class="text-left px-5 py-3">时间</th><th class="text-left px-5 py-3">操作</th></tr>
+                </thead>
+                <tbody class="divide-y divide-gray-50">
+                    {{range .Guestbooks}}
+                    <tr class="hover:bg-gray-50/50 transition">
+                        <td class="px-5 py-3 text-xs text-gray-400">{{.ID}}</td>
+                        <td class="px-5 py-3 text-xs font-medium text-gray-700">{{.Author}}</td>
+                        <td class="px-5 py-3 text-xs text-gray-600 max-w-[250px] line-clamp-2">{{.Content}}</td>
+                        <td class="px-5 py-3 text-xs text-gray-600 max-w-[220px]">
+                            {{if .AdminReply}}
+                            <div class="bg-indigo-50 text-indigo-700 rounded-lg px-2 py-1.5 line-clamp-2">{{.AdminReply}}</div>
+                            {{if .RepliedAt}}<div class="text-[10px] text-gray-400 mt-1">{{.RepliedAt.Format "01-02 15:04"}}</div>{{end}}
+                            {{else}}
+                            <span class="text-gray-300">未回复</span>
+                            {{end}}
+                        </td>
+                        <td class="px-5 py-3">
+                            {{$imageURL := safeURL .ImageURL}}
+                            {{if $imageURL}}<a href="{{$imageURL}}" target="_blank"><img loading="lazy" src="{{$imageURL}}" class="w-10 h-10 rounded-lg object-cover border"></a>{{else}}<span class="text-gray-300 text-xs">-</span>{{end}}
+                        </td>
+                        <td class="px-5 py-3 text-xs text-gray-400">{{formatTime .CreatedAt}}</td>
+                        <td class="px-5 py-3">
+                            <div class="flex items-center space-x-2">
+                                <button onclick="toggleGuestbookReply({{.ID}})" class="text-xs text-green-500 hover:text-green-700" title="回复"><i class="fa-solid fa-reply"></i></button>
+                                <button onclick="confirmAction('确定删除此留言？', '/admin/guestbook/delete/{{.ID}}')" class="text-xs text-red-400 hover:text-red-600" title="删除"><i class="fa-solid fa-trash"></i></button>
+                            </div>
+                            <div id="guestbook-reply-{{.ID}}" class="hidden mt-3">
+                                <form method="POST" action="/admin/guestbook/reply/{{.ID}}" class="flex items-center space-x-2">
+                                    <input type="text" name="content" value="{{.AdminReply}}" placeholder="输入回复内容..." required class="flex-1 border border-gray-200 rounded-lg px-2 py-1 text-xs outline-none focus:ring-1 focus:ring-indigo-200">
+                                    <button type="submit" class="bg-indigo-600 text-white text-xs px-3 py-1 rounded-lg hover:bg-indigo-700">回复</button>
+                                </form>
+                            </div>
+                        </td>
+                    </tr>
+                    {{end}}
+                </tbody>
+            </table>
+        </div>
         {{if eq (len .Guestbooks) 0}}<div class="text-center py-12 text-sm text-gray-400">暂无留言</div>{{end}}
     </div>
 

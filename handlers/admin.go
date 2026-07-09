@@ -850,14 +850,14 @@ func AdminMomentCreatePost(db *sql.DB) gin.HandlerFunc {
 		if createdAt != "" {
 			t, err := time.Parse("2006-01-02T15:04", createdAt)
 			if err == nil {
-				execLog(db, "INSERT INTO moments (content, media_urls, status, publish_at, created_at) VALUES (?, ?, ?, ?, ?)", content, mediaURLs, status, nil, t.Format("2006-01-02 15:04:05"))
+				execLog(db, "INSERT INTO moments (author, content, media_urls, status, publish_at, created_at) VALUES (?, ?, ?, ?, ?, ?)", getAdminUsername(c), content, mediaURLs, status, nil, t.Format("2006-01-02 15:04:05"))
 			} else {
-				execLog(db, "INSERT INTO moments (content, media_urls, status) VALUES (?, ?, ?)", content, mediaURLs, status)
+				execLog(db, "INSERT INTO moments (author, content, media_urls, status) VALUES (?, ?, ?, ?)", getAdminUsername(c), content, mediaURLs, status)
 			}
 		} else {
 			var pAt interface{}
 			if publishAt != "" { pAt = publishAt } else { pAt = nil }
-			execLog(db, "INSERT INTO moments (content, media_urls, status, publish_at) VALUES (?, ?, ?, ?)", content, mediaURLs, status, pAt)
+			execLog(db, "INSERT INTO moments (author, content, media_urls, status, publish_at) VALUES (?, ?, ?, ?, ?)", getAdminUsername(c), content, mediaURLs, status, pAt)
 		}
 		if status == "draft" {
 			logOperation(db, getAdminUsername(c), c, "保存瞬间草稿")
@@ -1017,7 +1017,24 @@ func AdminComments(db *sql.DB) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		data := adminData("评论管理", "messages", "comments", getAdminUsername(c), db)
 
-		rows, _ := db.Query("SELECT c1.id, c1.target_type, c1.target_id, c1.author, c1.author_avatar, c1.content, c1.image_url, c1.likes, c1.created_at, c1.parent_id, COALESCE(c2.author, '') as reply_to FROM comments c1 LEFT JOIN comments c2 ON c1.parent_id = c2.id ORDER BY c1.id DESC")
+		searchQuery := strings.TrimSpace(c.Query("q"))
+		filterType := strings.TrimSpace(c.Query("type"))
+		data["SearchQuery"] = searchQuery
+		data["FilterType"] = filterType
+
+		query := "SELECT c1.id, c1.target_type, c1.target_id, c1.author, c1.author_avatar, c1.content, c1.image_url, c1.likes, c1.created_at, c1.parent_id, COALESCE(c2.author, '') as reply_to FROM comments c1 LEFT JOIN comments c2 ON c1.parent_id = c2.id WHERE 1=1"
+		args := []interface{}{}
+		if filterType != "" {
+			query += " AND c1.target_type = ?"
+			args = append(args, filterType)
+		}
+		if searchQuery != "" {
+			query += " AND (c1.content LIKE ? OR c1.author LIKE ?)"
+			args = append(args, "%"+searchQuery+"%", "%"+searchQuery+"%")
+		}
+		query += " ORDER BY c1.id DESC"
+
+		rows, _ := db.Query(query, args...)
 		var comments []gin.H
 		if rows != nil {
 			for rows.Next() {
@@ -1111,7 +1128,18 @@ func AdminGuestbook(db *sql.DB) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		data := adminData("留言管理", "messages", "guestbook", getAdminUsername(c), db)
 
-		rows, _ := db.Query("SELECT id, author, content, image_url, ip, admin_reply, replied_at, created_at FROM guestbook ORDER BY id DESC")
+		searchQuery := strings.TrimSpace(c.Query("q"))
+		data["SearchQuery"] = searchQuery
+
+		query := "SELECT id, author, content, image_url, ip, admin_reply, replied_at, created_at FROM guestbook WHERE 1=1"
+		args := []interface{}{}
+		if searchQuery != "" {
+			query += " AND (content LIKE ? OR author LIKE ? OR admin_reply LIKE ?)"
+			args = append(args, "%"+searchQuery+"%", "%"+searchQuery+"%", "%"+searchQuery+"%")
+		}
+		query += " ORDER BY id DESC"
+
+		rows, _ := db.Query(query, args...)
 		var entries []gin.H
 		if rows != nil {
 			for rows.Next() {
@@ -1604,6 +1632,29 @@ func AdminAbout(db *sql.DB) gin.HandlerFunc {
 		am.SocialLinks = ensureDefaultSocialLinks(am.SocialLinks)
 
 		data["AboutMe"] = am
+
+		// 设备列表
+		devRows, _ := db.Query("SELECT id, name, image_url, info, order_num FROM devices ORDER BY order_num ASC, id ASC")
+		var devices []models.Device
+		if devRows != nil {
+			for devRows.Next() {
+				var d models.Device
+				devRows.Scan(&d.ID, &d.Name, &d.ImageURL, &d.Info, &d.OrderNum)
+				devices = append(devices, d)
+			}
+			devRows.Close()
+		}
+		data["Devices"] = devices
+
+		// 足迹列表
+		var footprintsRaw string
+		db.QueryRow("SELECT value FROM system_settings WHERE key='footprints_json'").Scan(&footprintsRaw)
+		var footprints []map[string]interface{}
+		if footprintsRaw != "" {
+			json.Unmarshal([]byte(footprintsRaw), &footprints)
+		}
+		data["Footprints"] = footprints
+
 		c.HTML(http.StatusOK, "admin/about.html", data)
 	}
 }

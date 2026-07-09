@@ -30,6 +30,7 @@ type Post struct {
 // Moment 瞬间模型
 type Moment struct {
 	ID        int64      `json:"id"`
+	Author    string     `json:"author"`
 	Content   string     `json:"content"`
 	MediaURLs string     `json:"media_urls"` // 逗号分隔的图片/视频URL
 	Likes     int64      `json:"likes"`
@@ -141,6 +142,7 @@ type PostWithMeta struct {
 type MomentView struct {
 	ID           int64     `json:"id"`
 	IDStr        string    `json:"id_str"`
+	Author       string    `json:"author"`
 	Content      string    `json:"content"`
 	MediaURLs    string    `json:"media_urls"`
 	Likes        int64     `json:"likes"`

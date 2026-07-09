@@ -13,6 +13,19 @@ function toggleNotification() {
     if (p.style.opacity === '1') { p.style.opacity = '0'; p.style.transform = 'translateX(20px)'; setTimeout(function(){p.style.display='none';},300); }
     else { p.style.display='block'; setTimeout(function(){p.style.opacity='1';p.style.transform='translateX(0)';},10); }
 }
+function markNotifRead() {
+    var dots = document.querySelectorAll('.notif-dot');
+    dots.forEach(function(d) { d.style.display = 'none'; });
+    try { localStorage.setItem('read_notif', document.querySelector('.notif-text') ? document.querySelector('.notif-text').textContent : ''); } catch(e) {}
+}
+(function() {
+    var seen = localStorage.getItem('read_notif');
+    var cur = document.querySelector('.notif-text');
+    if (cur && seen === (cur.textContent || cur.innerText)) {
+        var dots = document.querySelectorAll('.notif-dot');
+        dots.forEach(function(d) { d.style.display = 'none'; });
+    }
+})();
 document.addEventListener('click', function(e) {
     var p = document.getElementById('notification-panel');
     if (!p) return;

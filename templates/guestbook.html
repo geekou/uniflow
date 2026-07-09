@@ -112,7 +112,9 @@
             }
             .tri-scroll-column::-webkit-scrollbar { display: none; }
             #sidebar.tri-scroll-column,
-            main.tri-scroll-column { position: sticky; top: 1.5rem; }
+            #sidebar.tri-scroll-column,
+            main.tri-scroll-column,
+            aside.tri-scroll-column { position: sticky; top: 1.5rem; }
         }
     </style>
 </head>
@@ -558,6 +560,46 @@
                     var s = document.getElementById('heatmap-summary');
                     if (s) s.textContent = '加载失败';
                 });
+        })();
+
+        // 三栏同步滚轮：到边界的栏停止，未到边界的栏继续
+        (function() {
+            var media = window.matchMedia('(min-width: 1024px)');
+            var active = false;
+            function getColumns() {
+                if (!media.matches) return [];
+                return Array.prototype.slice.call(document.querySelectorAll('.tri-scroll-column')).filter(function(el) {
+                    var s = window.getComputedStyle(el);
+                    return s.display !== 'none' && s.visibility !== 'hidden' && el.scrollHeight > el.clientHeight + 1;
+                });
+            }
+            function canScroll(el, d) {
+                if (d > 0) return el.scrollTop + el.clientHeight < el.scrollHeight - 1;
+                if (d < 0) return el.scrollTop > 1;
+                return false;
+            }
+            function syncWheel(e) {
+                if (!media.matches || e.ctrlKey || e.metaKey) return;
+                if (e.target.closest('textarea, input, select, [contenteditable="true"], .glightbox-container')) return;
+                var delta = e.deltaY;
+                if (e.deltaMode === 1) delta *= 16; else if (e.deltaMode === 2) delta *= window.innerHeight;
+                if (!delta) return;
+                var cols = getColumns();
+                if (cols.length < 2) return;
+                var moved = false;
+                cols.forEach(function(el) {
+                    if (!canScroll(el, delta)) return;
+                    var before = el.scrollTop;
+                    el.scrollTop += delta;
+                    if (Math.abs(el.scrollTop - before) > 0.5) moved = true;
+                });
+                if (moved) e.preventDefault();
+            }
+            function bind() { if (!active) { window.addEventListener('wheel', syncWheel, { passive: false }); active = true; } }
+            function unbind() { if (active) { window.removeEventListener('wheel', syncWheel); active = false; } }
+            function refresh() { media.matches ? bind() : unbind(); }
+            refresh();
+            if (media.addEventListener) media.addEventListener('change', refresh); else media.addListener(refresh);
         })();
     </script>
 {{template "partials/footer-scripts" .}}

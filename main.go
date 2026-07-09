@@ -405,13 +405,11 @@ func main() {
 		adminOnly.GET("/about", handlers.AdminAbout(db))
 		adminOnly.POST("/about", handlers.AdminAboutPost(db))
 
-		// 设备管理
-		adminOnly.GET("/devices", handlers.AdminDevices(db))
+		// 设备管理（API）
 		adminOnly.POST("/devices/save", handlers.AdminDeviceSave(db))
 		adminOnly.POST("/devices/delete/:id", handlers.AdminDeviceDelete(db))
 
-		// 足迹管理
-		adminOnly.GET("/footprints", handlers.AdminFootprints(db))
+		// 足迹管理（API）
 		adminOnly.POST("/footprints/save", handlers.AdminFootprintSave(db))
 		adminOnly.POST("/footprints/delete/:index", handlers.AdminFootprintDelete(db))
 		adminOnly.GET("/sitemap", handlers.AdminSitemap(db))

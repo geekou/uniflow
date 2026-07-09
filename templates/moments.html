@@ -29,7 +29,9 @@
             }
             .tri-scroll-column::-webkit-scrollbar { display: none; }
             #sidebar.tri-scroll-column,
-            main.tri-scroll-column { position: sticky; top: 1.5rem; }
+            #sidebar.tri-scroll-column,
+            main.tri-scroll-column,
+            aside.tri-scroll-column { position: sticky; top: 1.5rem; }
         }
         @keyframes fadeIn { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: translateY(0); } }
         #back-to-top{position:fixed;bottom:2rem;right:2rem;z-index:50;width:2.5rem;height:2.5rem;border-radius:50%;background:rgba(99,102,241,0.85);color:#fff;display:flex;align-items:center;justify-content:center;font-size:1.1rem;opacity:0;visibility:hidden;transform:translateY(10px);transition:all 0.3s ease;box-shadow:0 4px 12px rgba(99,102,241,0.3);cursor:pointer}
@@ -107,10 +109,10 @@
                     {{$mid := .IDStr}}
                     <div id="moment-{{.ID}}" class="bg-white rounded-2xl p-5 shadow-xs border border-gray-100/50 scroll-mt-6">
                         <div class="flex items-start space-x-3">
-                            <img loading="lazy" class="w-9 h-9 rounded-full border shrink-0 mt-0.5" src="{{if safeImageURL $.AboutMe.Avatar}}{{safeImageURL $.AboutMe.Avatar}}{{else}}https://api.dicebear.com/7.x/adventurer/svg?seed={{defaultName $.AboutMe.Name}}{{end}}" alt="avatar">
+                            <img loading="lazy" class="w-9 h-9 rounded-full border shrink-0 mt-0.5" src="{{if safeImageURL $.AboutMe.Avatar}}{{safeImageURL $.AboutMe.Avatar}}{{else}}https://api.dicebear.com/7.x/adventurer/svg?seed={{.Author}}{{end}}" alt="avatar">
                             <div class="flex-1 min-w-0">
                                 <div class="flex items-center space-x-2 mb-1.5">
-                                    <span class="text-sm font-semibold text-gray-700">{{defaultName $.AboutMe.Name}}</span>
+                                    <span class="text-sm font-semibold text-gray-700">{{.Author}}</span>
                                     <span class="text-[11px] text-gray-400">{{.CreatedAt.Format "01-02 15:04"}}</span>
                                 </div>
                                 <p class="text-sm text-gray-700 leading-relaxed whitespace-pre-wrap">{{.Content}}</p>

@@ -4,8 +4,18 @@
         <h2 class="text-lg font-bold">关于我</h2>
     </div>
 
-    <form method="POST" action="/admin/about" id="aboutForm" class="space-y-4">
-        <div class="bg-white rounded-2xl p-6 shadow-xs border border-gray-100/50 space-y-5">
+    <!-- Tabs -->
+    <div class="bg-white rounded-2xl shadow-xs border border-gray-100/50 overflow-hidden mb-4">
+        <div class="flex border-b border-gray-100">
+            <button type="button" class="about-tab active px-5 py-3 text-sm font-medium text-indigo-600 border-b-2 border-indigo-600 bg-indigo-50/30 transition" data-tab="profile" onclick="switchAboutTab('profile')">个人资料</button>
+            <button type="button" class="about-tab px-5 py-3 text-sm font-medium text-gray-400 border-b-2 border-transparent hover:text-gray-600 transition" data-tab="devices" onclick="switchAboutTab('devices')">设备展示</button>
+            <button type="button" class="about-tab px-5 py-3 text-sm font-medium text-gray-400 border-b-2 border-transparent hover:text-gray-600 transition" data-tab="footprints" onclick="switchAboutTab('footprints')">足迹管理</button>
+        </div>
+
+        <!-- Tab 1: 个人资料 -->
+        <div class="about-panel" id="panel-profile">
+    <form method="POST" action="/admin/about" id="aboutForm" class="p-6 space-y-4">
+        <div class="space-y-5">
             <!-- 头像 + 姓名 -->
             <div class="grid grid-cols-2 gap-4">
                 <div>
@@ -39,7 +49,7 @@
         </div>
 
         <!-- 社交链接 -->
-        <div class="bg-white rounded-2xl p-6 shadow-xs border border-gray-100/50 space-y-4">
+        <div class="space-y-4 pt-2">
             <div class="flex items-center justify-between">
                 <div class="text-xs font-bold text-gray-400 tracking-wider">社交链接</div>
                 <button type="button" onclick="addSocialLink()" class="text-xs bg-indigo-50 text-indigo-600 px-3 py-1.5 rounded-lg hover:bg-indigo-100 transition font-medium"><i class="fa-solid fa-plus mr-1"></i>添加</button>
@@ -79,7 +89,7 @@
         </div>
 
         <!-- 个人简介（详细） -->
-        <div class="bg-white rounded-2xl p-6 shadow-xs border border-gray-100/50 space-y-3">
+        <div class="space-y-3 pt-2">
             <h3 class="text-sm font-semibold text-gray-700"><i class="fa-solid fa-align-left mr-1.5 text-indigo-500"></i>个人简介（详细）</h3>
             <div id="detail-editor" style="height:300px"></div>
             <textarea name="detail_intro" id="hidden-detail-intro" class="hidden"></textarea>
@@ -89,107 +99,239 @@
             <button type="submit" class="bg-indigo-600 text-white text-sm px-6 py-2.5 rounded-xl font-medium hover:bg-indigo-700 transition shadow-xs shadow-indigo-100">保存</button>
         </div>
     </form>
+        </div>
+
+        <!-- Tab 2: 设备展示 -->
+        <div class="about-panel hidden p-6 space-y-6" id="panel-devices">
+            <form id="device-form" class="space-y-3" enctype="multipart/form-data">
+                <input type="hidden" name="id" id="dev-id" value="">
+                <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    <div>
+                        <label class="text-xs font-medium text-gray-500 mb-1 block">设备名称 <span class="text-red-400">*</span></label>
+                        <input type="text" name="name" id="dev-name" required placeholder="如：MacBook Pro 16" class="w-full border border-gray-200 rounded-xl px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-indigo-200 focus:border-indigo-400">
+                    </div>
+                    <div>
+                        <label class="text-xs font-medium text-gray-500 mb-1 block">设备信息</label>
+                        <input type="text" name="info" id="dev-info" placeholder="如：Apple M3 Max / 36GB / 1TB" class="w-full border border-gray-200 rounded-xl px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-indigo-200 focus:border-indigo-400">
+                    </div>
+                </div>
+                <div class="flex items-center gap-3 flex-wrap">
+                    <div>
+                        <label class="inline-flex items-center gap-1.5 bg-gray-50 hover:bg-gray-100 text-xs text-gray-600 px-3 py-2 rounded-xl cursor-pointer border border-gray-200 transition">
+                            <i class="fa-solid fa-upload"></i> 选择图片
+                            <input type="file" name="image_file" accept="image/*" class="hidden" onchange="previewDeviceImage(this)">
+                        </label>
+                    </div>
+                    <div>
+                        <input type="text" name="image_url" id="dev-image" placeholder="图片 URL" class="border border-gray-200 rounded-xl px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-indigo-200 focus:border-indigo-400 w-48">
+                    </div>
+                    <div>
+                        <input type="number" name="order_num" id="dev-order" value="0" placeholder="排序" class="w-20 border border-gray-200 rounded-xl px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-indigo-200 focus:border-indigo-400">
+                    </div>
+                </div>
+                <div id="dev-preview" class="hidden mt-2"><img loading="lazy" id="dev-preview-img" class="w-24 h-24 rounded-xl object-cover border border-gray-100"></div>
+                <div class="flex items-center gap-3">
+                    <button type="submit" class="bg-indigo-600 text-white text-xs px-5 py-2 rounded-xl font-medium hover:bg-indigo-700 transition">保存</button>
+                    <button type="button" id="dev-cancel" class="hidden text-xs text-gray-400 hover:text-gray-600 transition" onclick="cancelDevEdit()">取消</button>
+                </div>
+            </form>
+            <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 pt-4 border-t border-gray-100" id="device-list">
+                {{range .Devices}}
+                <div class="bg-gray-50 rounded-xl p-4 border border-gray-100 hover:shadow-md transition group">
+                    {{if .ImageURL}}
+                    <div class="w-full h-32 rounded-lg overflow-hidden mb-3 bg-white">
+                        <img loading="lazy" src="{{.ImageURL}}" class="w-full h-full object-cover" alt="{{.Name}}">
+                    </div>
+                    {{else}}
+                    <div class="w-full h-20 rounded-lg bg-gradient-to-br from-gray-200 to-gray-300 flex items-center justify-center text-gray-400 text-2xl mb-3">
+                        <i class="fa-solid fa-display"></i>
+                    </div>
+                    {{end}}
+                    <h3 class="font-semibold text-sm text-gray-800">{{.Name}}</h3>
+                    {{if .Info}}<p class="text-xs text-gray-500 mt-1">{{.Info}}</p>{{end}}
+                    <div class="flex items-center gap-3 mt-3 opacity-0 group-hover:opacity-100 transition">
+                        <button onclick='editDevice({{.ID}}, `{{.Name}}`, `{{.ImageURL}}`, `{{.Info}}`, {{.OrderNum}})' class="text-xs text-indigo-500 hover:text-indigo-700"><i class="fa-solid fa-pen-to-square"></i> 编辑</button>
+                        <button onclick="confirmDevAction('确定删除此设备？', '/admin/devices/delete/{{.ID}}')" class="text-xs text-red-400 hover:text-red-600"><i class="fa-solid fa-trash"></i> 删除</button>
+                    </div>
+                </div>
+                {{end}}
+                {{if eq (len .Devices) 0}}<div class="col-span-full text-center py-8 text-sm text-gray-400">暂无设备，在上方添加</div>{{end}}
+            </div>
+        </div>
+
+        <!-- Tab 3: 足迹管理 -->
+        <div class="about-panel hidden p-6 space-y-6" id="panel-footprints">
+            <form id="fp-form" class="space-y-3">
+                <input type="hidden" name="index" id="fp-index" value="-1">
+                <div class="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                    <div>
+                        <label class="text-xs font-medium text-gray-500 mb-1 block">地名 <span class="text-red-400">*</span></label>
+                        <input type="text" name="name" id="fp-name" required placeholder="如：北京" class="w-full border border-gray-200 rounded-xl px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-indigo-200 focus:border-indigo-400">
+                    </div>
+                    <div>
+                        <label class="text-xs font-medium text-gray-500 mb-1 block">备注</label>
+                        <input type="text" name="note" id="fp-note" placeholder="如：2023年旅行" class="w-full border border-gray-200 rounded-xl px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-indigo-200 focus:border-indigo-400">
+                    </div>
+                </div>
+                <div class="flex items-center gap-3">
+                    <button type="submit" class="bg-indigo-600 text-white text-xs px-5 py-2 rounded-xl font-medium hover:bg-indigo-700 transition">保存</button>
+                    <button type="button" id="fp-cancel" class="hidden text-xs text-gray-400 hover:text-gray-600 transition" onclick="cancelFpEdit()">取消</button>
+                </div>
+            </form>
+            <div class="pt-4 border-t border-gray-100">
+                <table class="w-full text-sm" id="fp-table">
+                    <thead class="bg-gray-50/50 text-xs text-gray-400">
+                        <tr><th class="text-left px-4 py-3">#</th><th class="text-left px-4 py-3">地名</th><th class="text-left px-4 py-3">坐标</th><th class="text-left px-4 py-3">备注</th><th class="text-left px-4 py-3">操作</th></tr>
+                    </thead>
+                    <tbody class="divide-y divide-gray-50">
+                        {{range $i, $fp := .Footprints}}
+                        <tr class="hover:bg-gray-50/50 transition">
+                            <td class="px-4 py-3 text-xs text-gray-400">{{$i}}</td>
+                            <td class="px-4 py-3 font-medium text-gray-700 text-xs">{{$fp.name}}</td>
+                            <td class="px-4 py-3 text-xs text-gray-500">{{$fp.lat}}, {{$fp.lng}}</td>
+                            <td class="px-4 py-3 text-xs text-gray-400">{{$fp.note}}</td>
+                            <td class="px-4 py-3">
+                                <div class="flex items-center space-x-2">
+                                    <button onclick='editFP({{$i}}, `{{$fp.name}}`, {{$fp.lat}}, {{$fp.lng}}, `{{$fp.note}}`)' class="text-xs text-indigo-500 hover:text-indigo-700"><i class="fa-solid fa-pen-to-square"></i></button>
+                                    <button onclick="confirmFpAction('确定删除？', '/admin/footprints/delete/{{$i}}')" class="text-xs text-red-400 hover:text-red-600"><i class="fa-solid fa-trash"></i></button>
+                                </div>
+                            </td>
+                        </tr>
+                        {{end}}
+                    </tbody>
+                </table>
+                {{if eq (len .Footprints) 0}}<div class="text-center py-8 text-sm text-gray-400">暂无足迹，在上方添加</div>{{end}}
+            </div>
+        </div>
+    </div>
 
     <script>
-        function previewAvatar(input) {
-            if (input.files && input.files[0]) {
-                var reader = new FileReader();
-                reader.onload = function(e) {
-                    document.getElementById('avatar-preview').src = e.target.result;
-                };
-                reader.readAsDataURL(input.files[0]);
-            }
-        }
-        var platformNames = {
-            custom: '自定义',
-            qq: 'QQ',
-            wechat: '微信',
-            douyin: '抖音',
-            bilibili: '哔哩哔哩',
-            xiaohongshu: '小红书',
-            github: 'GitHub',
-            twitter: 'Twitter',
-            email: '邮箱'
-        };
+    // Tab 切换
+    function switchAboutTab(name) {
+        sessionStorage.setItem('about_tab', name);
+        document.querySelectorAll('.about-tab').forEach(function(t) {
+            t.classList.remove('active','text-indigo-600','border-indigo-600','bg-indigo-50/30');
+            t.classList.add('text-gray-400','border-transparent');
+        });
+        var active = document.querySelector('.about-tab[data-tab="'+name+'"]');
+        active.classList.add('active','text-indigo-600','border-indigo-600','bg-indigo-50/30');
+        active.classList.remove('text-gray-400','border-transparent');
+        document.querySelectorAll('.about-panel').forEach(function(p) { p.classList.add('hidden'); });
+        document.getElementById('panel-'+name).classList.remove('hidden');
+    }
+    // 页面加载时恢复上次的tab
+    (function() {
+        var tab = sessionStorage.getItem('about_tab');
+        if (tab && tab !== 'profile') switchAboutTab(tab);
+    })();
 
-        function socialPlatformOptions(selected) {
-            return Object.keys(platformNames).map(function(key) {
-                return '<option value="' + key + '"' + (key === selected ? ' selected' : '') + '>' + platformNames[key] + '</option>';
-            }).join('');
+    // ====== 个人资料 ======
+    function previewAvatar(input) {
+        if (input.files && input.files[0]) {
+            var reader = new FileReader();
+            reader.onload = function(e) { document.getElementById('avatar-preview').src = e.target.result; };
+            reader.readAsDataURL(input.files[0]);
         }
-
-        function syncSocialName(select) {
-            var row = select.closest('.social-link-row');
-            var nameInput = row.querySelector('input[name="social_name"]');
-            if (select.value !== 'custom' && (!nameInput.value || platformNames[nameInput.value] === nameInput.value)) {
-                nameInput.value = platformNames[select.value] || '';
-            }
+    }
+    var platformNames = {
+        custom: '自定义', qq: 'QQ', wechat: '微信', douyin: '抖音',
+        bilibili: '哔哩哔哩', xiaohongshu: '小红书', github: 'GitHub', twitter: 'Twitter', email: '邮箱'
+    };
+    function socialPlatformOptions(selected) {
+        return Object.keys(platformNames).map(function(key) {
+            return '<option value="' + key + '"' + (key === selected ? ' selected' : '') + '>' + platformNames[key] + '</option>';
+        }).join('');
+    }
+    function syncSocialName(select) {
+        var row = select.closest('.social-link-row');
+        var nameInput = row.querySelector('input[name="social_name"]');
+        if (select.value !== 'custom' && (!nameInput.value || platformNames[nameInput.value] === nameInput.value)) {
+            nameInput.value = platformNames[select.value] || '';
         }
+    }
+    function addSocialLink() {
+        var container = document.getElementById('social-links');
+        document.getElementById('no-links-hint').classList.add('hidden');
+        var row = document.createElement('div');
+        row.className = 'social-link-row flex items-center gap-3 bg-gray-50 p-3 rounded-xl';
+        row.innerHTML = '<div class="flex-1 grid grid-cols-[80px_1fr_1fr_2fr] gap-3">' +
+            '<input type="number" min="1" name="social_sort" value="" placeholder="顺序" class="social-sort border border-gray-200 rounded-lg px-3 py-2 text-xs outline-none focus:ring-2 focus:ring-indigo-200 focus:border-indigo-400">' +
+            '<select name="social_platform" onchange="syncSocialName(this)" class="border border-gray-200 rounded-lg px-3 py-2 text-xs outline-none focus:ring-2 focus:ring-indigo-200 focus:border-indigo-400">' + socialPlatformOptions('custom') + '</select>' +
+            '<input type="text" name="social_name" value="" placeholder="显示名称" class="border border-gray-200 rounded-lg px-3 py-2 text-xs outline-none focus:ring-2 focus:ring-indigo-200 focus:border-indigo-400">' +
+            '<input type="text" name="social_url" value="" placeholder="链接地址（可留空）" class="border border-gray-200 rounded-lg px-3 py-2 text-xs outline-none focus:ring-2 focus:ring-indigo-200 focus:border-indigo-400">' +
+            '</div>' +
+            '<div class="flex items-center gap-1">' +
+            '<button type="button" onclick="moveSocialLink(this, -1)" class="text-gray-400 hover:text-indigo-500 transition text-sm p-1" title="上移"><i class="fa-solid fa-arrow-up"></i></button>' +
+            '<button type="button" onclick="moveSocialLink(this, 1)" class="text-gray-400 hover:text-indigo-500 transition text-sm p-1" title="下移"><i class="fa-solid fa-arrow-down"></i></button>' +
+            '<button type="button" onclick="removeSocialLink(this)" class="text-gray-400 hover:text-red-500 transition text-sm p-1" title="删除"><i class="fa-solid fa-trash-can"></i></button>' +
+            '</div>';
+        container.appendChild(row);
+        renumberSocialLinks();
+    }
+    function renumberSocialLinks() {
+        document.querySelectorAll('#social-links .social-sort').forEach(function(input, index) { input.value = (index + 1) * 10; });
+    }
+    function moveSocialLink(btn, direction) {
+        var row = btn.closest('.social-link-row');
+        if (!row) return;
+        if (direction < 0 && row.previousElementSibling) row.parentNode.insertBefore(row, row.previousElementSibling);
+        if (direction > 0 && row.nextElementSibling) row.parentNode.insertBefore(row.nextElementSibling, row);
+        renumberSocialLinks();
+    }
+    function removeSocialLink(btn) {
+        btn.closest('.social-link-row').remove();
+        if (document.getElementById('social-links').children.length === 0)
+            document.getElementById('no-links-hint').classList.remove('hidden');
+        renumberSocialLinks();
+    }
 
-        function addSocialLink() {
-            var container = document.getElementById('social-links');
-            var hint = document.getElementById('no-links-hint');
-            hint.classList.add('hidden');
-
-            var row = document.createElement('div');
-            row.className = 'social-link-row flex items-center gap-3 bg-gray-50 p-3 rounded-xl';
-            row.innerHTML = '<div class="flex-1 grid grid-cols-[80px_1fr_1fr_2fr] gap-3">' +
-                '<input type="number" min="1" name="social_sort" value="" placeholder="顺序" class="social-sort border border-gray-200 rounded-lg px-3 py-2 text-xs outline-none focus:ring-2 focus:ring-indigo-200 focus:border-indigo-400">' +
-                '<select name="social_platform" onchange="syncSocialName(this)" class="border border-gray-200 rounded-lg px-3 py-2 text-xs outline-none focus:ring-2 focus:ring-indigo-200 focus:border-indigo-400">' + socialPlatformOptions('custom') + '</select>' +
-                '<input type="text" name="social_name" value="" placeholder="显示名称" class="border border-gray-200 rounded-lg px-3 py-2 text-xs outline-none focus:ring-2 focus:ring-indigo-200 focus:border-indigo-400">' +
-                '<input type="text" name="social_url" value="" placeholder="链接地址（可留空）" class="border border-gray-200 rounded-lg px-3 py-2 text-xs outline-none focus:ring-2 focus:ring-indigo-200 focus:border-indigo-400">' +
-                '</div>' +
-                '<div class="flex items-center gap-1">' +
-                '<button type="button" onclick="moveSocialLink(this, -1)" class="text-gray-400 hover:text-indigo-500 transition text-sm p-1" title="上移"><i class="fa-solid fa-arrow-up"></i></button>' +
-                '<button type="button" onclick="moveSocialLink(this, 1)" class="text-gray-400 hover:text-indigo-500 transition text-sm p-1" title="下移"><i class="fa-solid fa-arrow-down"></i></button>' +
-                '<button type="button" onclick="removeSocialLink(this)" class="text-gray-400 hover:text-red-500 transition text-sm p-1" title="删除"><i class="fa-solid fa-trash-can"></i></button>' +
-                '</div>';
-            container.appendChild(row);
-            renumberSocialLinks();
-        }
-
-        function renumberSocialLinks() {
-            document.querySelectorAll('#social-links .social-sort').forEach(function(input, index) {
-                input.value = (index + 1) * 10;
-            });
-        }
-
-        function moveSocialLink(btn, direction) {
-            var row = btn.closest('.social-link-row');
-            if (!row) return;
-            if (direction < 0 && row.previousElementSibling) {
-                row.parentNode.insertBefore(row, row.previousElementSibling);
-            }
-            if (direction > 0 && row.nextElementSibling) {
-                row.parentNode.insertBefore(row.nextElementSibling, row);
-            }
-            renumberSocialLinks();
-        }
-
-        function removeSocialLink(btn) {
-            var row = btn.closest('.social-link-row');
-            row.remove();
-            var container = document.getElementById('social-links');
-            if (container.children.length === 0) {
-                document.getElementById('no-links-hint').classList.remove('hidden');
-            }
-            renumberSocialLinks();
-        }
+    // Detail editor
+    var detailQuill;
     </script>
     <script src="/static/vendor/quill/quill.js"></script>
     <script>
-        var detailQuill = new Quill('#detail-editor', {
-            theme: 'snow',
-            placeholder: '写一段关于你的详细介绍...',
+        detailQuill = new Quill('#detail-editor', {
+            theme: 'snow', placeholder: '写一段关于你的详细介绍...',
             modules: { toolbar: [['bold','italic','underline'],['link','blockquote','code-block'],[{list:'ordered'},{list:'bullet'}],[{size:['small','normal','large','huge']}],['clean']] }
         });
-        // 加载已有内容
         var existing = {{if .AboutMe.DetailIntro}}'{{.AboutMe.DetailIntro}}'{{else}}''{{end}};
         if (existing) detailQuill.root.innerHTML = existing.replace(/&lt;/g,'<').replace(/&gt;/g,'>').replace(/&amp;/g,'&').replace(/&#34;/g,'"').replace(/&#39;/g,"'");
-
-        // 提交前同步到隐藏域
         document.getElementById('aboutForm').addEventListener('submit', function() {
             document.getElementById('hidden-detail-intro').value = detailQuill.root.innerHTML;
         });
+
+    // ====== 设备 ======
+    function previewDeviceImage(input) {
+        var p = document.getElementById('dev-preview'), img = document.getElementById('dev-preview-img');
+        if (input.files && input.files[0]) { img.src = URL.createObjectURL(input.files[0]); p.classList.remove('hidden'); }
+        else p.classList.add('hidden');
+    }
+    document.getElementById('device-form').addEventListener('submit', function(e) {
+        e.preventDefault();
+        fetch('/admin/devices/save', { method: 'POST', body: new FormData(this) })
+            .then(r => r.json()).then(data => { if (data.ok) location.reload(); else alert(data.msg || '保存失败'); })
+            .catch(() => alert('网络错误'));
+    });
+    function editDevice(id, name, image, info, order) {
+        document.getElementById('dev-id').value = id; document.getElementById('dev-name').value = name;
+        document.getElementById('dev-image').value = image; document.getElementById('dev-info').value = info;
+        document.getElementById('dev-order').value = order; document.getElementById('dev-cancel').classList.remove('hidden');
+    }
+    function cancelDevEdit() { document.getElementById('device-form').reset(); document.getElementById('dev-id').value = ''; document.getElementById('dev-cancel').classList.add('hidden'); }
+    function confirmDevAction(msg, url) { if (confirm(msg)) fetch(url, { method: 'POST' }).then(r => r.json()).then(data => { if (data.ok) location.reload(); }); }
+
+    // ====== 足迹 ======
+    document.getElementById('fp-form').addEventListener('submit', function(e) {
+        e.preventDefault();
+        fetch('/admin/footprints/save', { method: 'POST', body: new URLSearchParams(new FormData(this)) })
+            .then(r => r.json()).then(data => { if (data.ok) location.reload(); else alert(data.msg || '保存失败'); })
+            .catch(() => alert('网络错误'));
+    });
+    function editFP(index, name, lat, lng, note) {
+        document.getElementById('fp-index').value = index; document.getElementById('fp-name').value = name;
+        document.getElementById('fp-note').value = note || ''; document.getElementById('fp-cancel').classList.remove('hidden');
+    }
+    function cancelFpEdit() { document.getElementById('fp-form').reset(); document.getElementById('fp-index').value = '-1'; document.getElementById('fp-cancel').classList.add('hidden'); }
+    function confirmFpAction(msg, url) { if (confirm(msg)) fetch(url, { method: 'POST' }).then(r => r.json()).then(data => { if (data.ok) location.reload(); }); }
     </script>
 {{template "admin_tail" .}}

@@ -4,187 +4,202 @@
     </div>
 
     <form method="POST" action="/admin/settings" enctype="multipart/form-data" class="space-y-4">
-        <div class="bg-white rounded-2xl p-6 shadow-xs border border-gray-100/50 space-y-5">
-            <div>
-                <label class="text-xs font-medium text-gray-500 mb-1 block">站点标题</label>
-                <input type="text" name="site_title" value="{{index .Settings "site_title"}}" class="w-full border border-gray-200 rounded-xl px-4 py-2.5 text-sm outline-none focus:ring-2 focus:ring-indigo-200 focus:border-indigo-400">
+        <!-- Tabs -->
+        <div class="bg-white rounded-2xl shadow-xs border border-gray-100/50 overflow-hidden">
+            <div class="flex border-b border-gray-100">
+                <button type="button" class="settings-tab active px-5 py-3 text-sm font-medium text-indigo-600 border-b-2 border-indigo-600 bg-indigo-50/30 transition" data-tab="basic">基本信息</button>
+                <button type="button" class="settings-tab px-5 py-3 text-sm font-medium text-gray-400 border-b-2 border-transparent hover:text-gray-600 transition" data-tab="banner">Banner & 赞赏</button>
+                <button type="button" class="settings-tab px-5 py-3 text-sm font-medium text-gray-400 border-b-2 border-transparent hover:text-gray-600 transition" data-tab="security">安全 & 地图</button>
             </div>
-            <div>
-                <label class="text-xs font-medium text-gray-500 mb-1 block">站点副标题</label>
-                <input type="text" name="site_subtitle" value="{{index .Settings "site_subtitle"}}" class="w-full border border-gray-200 rounded-xl px-4 py-2.5 text-sm outline-none focus:ring-2 focus:ring-indigo-200 focus:border-indigo-400">
-            </div>
-            <div>
-                <label class="text-xs font-medium text-gray-500 mb-1 block">氛围 Banner 图设置</label>
-                <!-- 全局开关 -->
-                <div class="bg-amber-50 border border-amber-200/60 rounded-xl p-3 mb-3 flex items-center justify-between">
-                    <div>
-                        <p class="text-xs font-medium text-amber-800">所有页面使用首页 Banner</p>
-                        <p class="text-[10px] text-amber-600 mt-0.5">打开后，文章/瞬间/留言板页面将统一使用下方"首页"的 Banner 图</p>
-                    </div>
-                    <label class="relative inline-flex items-center cursor-pointer flex-shrink-0 ml-3">
-                        <input type="checkbox" name="banner_use_homepage" value="true" class="sr-only peer"
-                            {{if ne (index .Settings "banner_use_homepage") "false"}}checked{{end}}
-                            onchange="togglePageBanners()">
-                        <div class="w-10 h-5 bg-gray-200 peer-focus:ring-2 peer-focus:ring-amber-300 rounded-full peer peer-checked:after:translate-x-full after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-amber-500"></div>
-                    </label>
-                </div>
-                <!-- Banner 页面卡片 -->
-                <div id="page-banners" class="grid grid-cols-1 lg:grid-cols-2 gap-3">
-                    <!-- 首页 -->
-                    <div class="bg-gray-50/70 rounded-xl p-3 border border-gray-100/80">
-                        <h4 class="text-xs font-semibold text-gray-600 mb-2 flex items-center gap-1.5"><span class="w-1 h-4 bg-indigo-400 rounded-full inline-block"></span>首页</h4>
-                        <div class="space-y-1.5">
-                            <div class="flex items-center gap-2">
-                                <label class="flex-shrink-0 bg-indigo-50 text-indigo-600 text-[11px] font-medium px-3 py-1.5 rounded-lg cursor-pointer hover:bg-indigo-100 transition">
-                                    <i class="fa-solid fa-cloud-arrow-up mr-1"></i>上传
-                                    <input type="file" name="banner_file" accept="image/*" class="hidden" onchange="previewBanner(this, 'banner-preview-index')">
-                                </label>
-                                <input type="text" name="banner_url" placeholder="或填写 URL" value="{{safeImageURL (index .Settings "banner_url")}}" class="flex-1 border border-gray-200 rounded-lg px-2.5 py-1.5 text-[11px] outline-none focus:ring-1 focus:ring-indigo-200 focus:border-indigo-400">
-                            </div>
-                            <div id="banner-preview-index" class="overflow-hidden rounded-lg h-20 bg-gray-100 border border-gray-100">
-                                {{if index .Settings "banner_url"}}
-                                <img loading="lazy" src="{{safeImageURL (index .Settings "banner_url")}}" class="w-full h-full object-cover">
-                                {{else}}
-                                <div class="w-full h-full flex items-center justify-center text-gray-300 text-[10px]"><i class="fa-regular fa-image mr-1"></i>默认使用置顶文章封面</div>
-                                {{end}}
-                            </div>
-                        </div>
-                    </div>
-                    <!-- 文章页 -->
-                    <div class="bg-gray-50/70 rounded-xl p-3 border border-gray-100/80 page-banner-item">
-                        <h4 class="text-xs font-semibold text-gray-600 mb-2 flex items-center gap-1.5"><span class="w-1 h-4 bg-blue-400 rounded-full inline-block"></span>文章页</h4>
-                        <div class="space-y-1.5">
-                            <div class="flex items-center gap-2">
-                                <label class="flex-shrink-0 bg-blue-50 text-blue-600 text-[11px] font-medium px-3 py-1.5 rounded-lg cursor-pointer hover:bg-blue-100 transition">
-                                    <i class="fa-solid fa-cloud-arrow-up mr-1"></i>上传
-                                    <input type="file" name="banner_file_posts" accept="image/*" class="hidden" onchange="previewBanner(this, 'banner-preview-posts')">
-                                </label>
-                                <input type="text" name="banner_url_posts" placeholder="或填写 URL" value="{{safeImageURL (index .Settings "banner_url_posts")}}" class="flex-1 border border-gray-200 rounded-lg px-2.5 py-1.5 text-[11px] outline-none focus:ring-1 focus:ring-blue-200 focus:border-blue-400">
-                            </div>
-                            <div id="banner-preview-posts" class="overflow-hidden rounded-lg h-20 bg-gray-100 border border-gray-100">
-                                {{if index .Settings "banner_url_posts"}}
-                                <img loading="lazy" src="{{safeImageURL (index .Settings "banner_url_posts")}}" class="w-full h-full object-cover">
-                                {{else}}
-                                <div class="w-full h-full flex items-center justify-center text-gray-300 text-[10px]"><i class="fa-regular fa-image mr-1"></i>未设置则用首页 Banner</div>
-                                {{end}}
-                            </div>
-                        </div>
-                    </div>
-                    <!-- 瞬间页 -->
-                    <div class="bg-gray-50/70 rounded-xl p-3 border border-gray-100/80 page-banner-item">
-                        <h4 class="text-xs font-semibold text-gray-600 mb-2 flex items-center gap-1.5"><span class="w-1 h-4 bg-emerald-400 rounded-full inline-block"></span>瞬间页</h4>
-                        <div class="space-y-1.5">
-                            <div class="flex items-center gap-2">
-                                <label class="flex-shrink-0 bg-emerald-50 text-emerald-600 text-[11px] font-medium px-3 py-1.5 rounded-lg cursor-pointer hover:bg-emerald-100 transition">
-                                    <i class="fa-solid fa-cloud-arrow-up mr-1"></i>上传
-                                    <input type="file" name="banner_file_moments" accept="image/*" class="hidden" onchange="previewBanner(this, 'banner-preview-moments')">
-                                </label>
-                                <input type="text" name="banner_url_moments" placeholder="或填写 URL" value="{{safeImageURL (index .Settings "banner_url_moments")}}" class="flex-1 border border-gray-200 rounded-lg px-2.5 py-1.5 text-[11px] outline-none focus:ring-1 focus:ring-emerald-200 focus:border-emerald-400">
-                            </div>
-                            <div id="banner-preview-moments" class="overflow-hidden rounded-lg h-20 bg-gray-100 border border-gray-100">
-                                {{if index .Settings "banner_url_moments"}}
-                                <img loading="lazy" src="{{safeImageURL (index .Settings "banner_url_moments")}}" class="w-full h-full object-cover">
-                                {{else}}
-                                <div class="w-full h-full flex items-center justify-center text-gray-300 text-[10px]"><i class="fa-regular fa-image mr-1"></i>未设置则用首页 Banner</div>
-                                {{end}}
-                            </div>
-                        </div>
-                    </div>
-                    <!-- 留言板 -->
-                    <div class="bg-gray-50/70 rounded-xl p-3 border border-gray-100/80 page-banner-item">
-                        <h4 class="text-xs font-semibold text-gray-600 mb-2 flex items-center gap-1.5"><span class="w-1 h-4 bg-rose-400 rounded-full inline-block"></span>留言板</h4>
-                        <div class="space-y-1.5">
-                            <div class="flex items-center gap-2">
-                                <label class="flex-shrink-0 bg-rose-50 text-rose-600 text-[11px] font-medium px-3 py-1.5 rounded-lg cursor-pointer hover:bg-rose-100 transition">
-                                    <i class="fa-solid fa-cloud-arrow-up mr-1"></i>上传
-                                    <input type="file" name="banner_file_guestbook" accept="image/*" class="hidden" onchange="previewBanner(this, 'banner-preview-guestbook')">
-                                </label>
-                                <input type="text" name="banner_url_guestbook" placeholder="或填写 URL" value="{{safeImageURL (index .Settings "banner_url_guestbook")}}" class="flex-1 border border-gray-200 rounded-lg px-2.5 py-1.5 text-[11px] outline-none focus:ring-1 focus:ring-rose-200 focus:border-rose-400">
-                            </div>
-                            <div id="banner-preview-guestbook" class="overflow-hidden rounded-lg h-20 bg-gray-100 border border-gray-100">
-                                {{if index .Settings "banner_url_guestbook"}}
-                                <img loading="lazy" src="{{safeImageURL (index .Settings "banner_url_guestbook")}}" class="w-full h-full object-cover">
-                                {{else}}
-                                <div class="w-full h-full flex items-center justify-center text-gray-300 text-[10px]"><i class="fa-regular fa-image mr-1"></i>未设置则用首页 Banner</div>
-                                {{end}}
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            </div>
-            <div>
-                <label class="text-xs font-medium text-gray-500 mb-1 block">敏感词库（逗号分隔）</label>
-                <textarea name="sensitive_words" rows="4" placeholder="多个敏感词用英文逗号分隔，如：词1,词2,词3" class="w-full border border-gray-200 rounded-xl px-4 py-2.5 text-sm outline-none focus:ring-2 focus:ring-indigo-200 focus:border-indigo-400 resize-none">{{index .Settings "sensitive_words"}}</textarea>
-            </div>
-            <div class="grid grid-cols-2 gap-4">
-                <div>
-                    <label class="text-xs font-medium text-gray-500 mb-1 block">评论频率限制（次/分钟）</label>
-                    <input type="number" name="comment_limit_count" min="1" value="{{index .Settings "comment_limit_count"}}" class="w-full border border-gray-200 rounded-xl px-4 py-2.5 text-sm outline-none focus:ring-2 focus:ring-indigo-200 focus:border-indigo-400">
-                </div>
-                <div>
-                    <label class="text-xs font-medium text-gray-500 mb-1 block">限制时间窗口（分钟）</label>
-                    <input type="number" name="comment_limit_minute" min="1" value="{{index .Settings "comment_limit_minute"}}" class="w-full border border-gray-200 rounded-xl px-4 py-2.5 text-sm outline-none focus:ring-2 focus:ring-indigo-200 focus:border-indigo-400">
-                </div>
-            </div>
-            <div>
-                <label class="text-xs font-medium text-gray-500 mb-1 block">站点通知</label>
-                <textarea name="site_notification" rows="2" placeholder="输入通知内容，留空则不显示通知图标" class="w-full border border-gray-200 rounded-xl px-4 py-2.5 text-sm outline-none focus:ring-2 focus:ring-indigo-200 focus:border-indigo-400 resize-none">{{index .Settings "site_notification"}}</textarea>
-                <p class="text-[11px] text-gray-400 mt-1">设置后，前台顶部通知图标将显示红点，点击可查看通知内容</p>
-            </div>
-            <div>
-                <label class="text-xs font-medium text-gray-500 mb-1 block">建站时间</label>
-                <input type="datetime-local" name="site_founded_at" value="{{index .Settings "site_founded_at"}}" class="w-full border border-gray-200 rounded-xl px-4 py-2.5 text-sm outline-none focus:ring-2 focus:ring-indigo-200 focus:border-indigo-400">
-                <p class="text-[11px] text-gray-400 mt-1">设置后，前台和后台侧边栏将显示建站运行时长</p>
-            </div>
-            <div>
-                <label class="text-xs font-medium text-gray-500 mb-1 block">高德地图 Key</label>
-                <input type="text" name="amap_key" value="{{index .Settings "amap_key"}}" placeholder="前往 https://lbs.amap.com 申请 Web端 JS API Key" class="w-full border border-gray-200 rounded-xl px-4 py-2.5 text-sm outline-none focus:ring-2 focus:ring-indigo-200 focus:border-indigo-400">
-                <p class="text-[11px] text-gray-400 mt-1">用于「关于我」页面的足迹地图</p>
-            </div>
-            <div>
-                <label class="text-xs font-medium text-gray-500 mb-1 block">高德安全密钥</label>
-                <input type="text" name="amap_jscode" value="{{index .Settings "amap_jscode"}}" placeholder="高德控制台 → 应用管理 → 查看安全密钥（jscode）" class="w-full border border-gray-200 rounded-xl px-4 py-2.5 text-sm outline-none focus:ring-2 focus:ring-indigo-200 focus:border-indigo-400">
-            </div>
-        </div>
 
-        <!-- 赞赏收款码 -->
-        <div class="bg-white rounded-2xl p-6 shadow-xs border border-gray-100/50 space-y-5 mt-4">
-            <h3 class="text-sm font-bold text-gray-700"><i class="fa-solid fa-qrcode mr-1.5 text-indigo-500"></i>赞赏收款码</h3>
-            <p class="text-[11px] text-gray-400 -mt-3">上传后，文章详情页将显示赞赏按钮，悬停弹出收款码</p>
-            <div class="grid grid-cols-2 gap-4">
+            <!-- Tab 1: 基本信息 -->
+            <div class="settings-panel p-6 space-y-5" id="panel-basic">
                 <div>
-                    <label class="text-xs font-medium text-gray-500 mb-1 block">微信收款码</label>
-                    <div class="space-y-2">
-                        <label class="inline-flex bg-green-50 text-green-600 text-xs font-medium px-4 py-2 rounded-xl cursor-pointer hover:bg-green-100 transition">
-                            <i class="fa-brands fa-weixin mr-1.5"></i>上传微信码
-                            <input type="file" name="wechat_qr_file" accept="image/*" class="hidden" onchange="previewQR(this, 'wechat-preview')">
+                    <label class="text-xs font-medium text-gray-500 mb-1 block">站点标题</label>
+                    <input type="text" name="site_title" value="{{index .Settings "site_title"}}" class="w-full border border-gray-200 rounded-xl px-4 py-2.5 text-sm outline-none focus:ring-2 focus:ring-indigo-200 focus:border-indigo-400">
+                </div>
+                <div>
+                    <label class="text-xs font-medium text-gray-500 mb-1 block">站点副标题</label>
+                    <input type="text" name="site_subtitle" value="{{index .Settings "site_subtitle"}}" class="w-full border border-gray-200 rounded-xl px-4 py-2.5 text-sm outline-none focus:ring-2 focus:ring-indigo-200 focus:border-indigo-400">
+                </div>
+                <div>
+                    <label class="text-xs font-medium text-gray-500 mb-1 block">建站时间</label>
+                    <input type="datetime-local" name="site_founded_at" value="{{index .Settings "site_founded_at"}}" class="w-full border border-gray-200 rounded-xl px-4 py-2.5 text-sm outline-none focus:ring-2 focus:ring-indigo-200 focus:border-indigo-400">
+                    <p class="text-[11px] text-gray-400 mt-1">设置后，前台和后台侧边栏将显示建站运行时长</p>
+                </div>
+                <div>
+                    <label class="text-xs font-medium text-gray-500 mb-1 block">站点通知</label>
+                    <textarea name="site_notification" rows="2" placeholder="输入通知内容，留空则不显示通知图标" class="w-full border border-gray-200 rounded-xl px-4 py-2.5 text-sm outline-none focus:ring-2 focus:ring-indigo-200 focus:border-indigo-400 resize-none">{{index .Settings "site_notification"}}</textarea>
+                    <p class="text-[11px] text-gray-400 mt-1">设置后，前台顶部通知图标将显示红点，点击可查看通知内容</p>
+                </div>
+            </div>
+
+            <!-- Tab 2: Banner & 赞赏 -->
+            <div class="settings-panel p-6 space-y-5 hidden" id="panel-banner">
+                <div>
+                    <label class="text-xs font-medium text-gray-500 mb-1 block">氛围 Banner 图设置</label>
+                    <div class="bg-amber-50 border border-amber-200/60 rounded-xl p-3 mb-3 flex items-center justify-between">
+                        <div>
+                            <p class="text-xs font-medium text-amber-800">所有页面使用首页 Banner</p>
+                            <p class="text-[10px] text-amber-600 mt-0.5">打开后，文章/瞬间/留言板页面将统一使用下方"首页"的 Banner 图</p>
+                        </div>
+                        <label class="relative inline-flex items-center cursor-pointer flex-shrink-0 ml-3">
+                            <input type="checkbox" name="banner_use_homepage" value="true" class="sr-only peer"
+                                {{if ne (index .Settings "banner_use_homepage") "false"}}checked{{end}}
+                                onchange="togglePageBanners()">
+                            <div class="w-10 h-5 bg-gray-200 peer-focus:ring-2 peer-focus:ring-amber-300 rounded-full peer peer-checked:after:translate-x-full after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-amber-500"></div>
                         </label>
-                        {{if index .Settings "wechat_qr"}}<input type="hidden" name="wechat_qr" value="{{safeImageURL (index .Settings "wechat_qr")}}">{{end}}
-                        <div id="wechat-preview" class="w-28 h-28 rounded-xl border border-gray-100 bg-gray-50 flex items-center justify-center overflow-hidden">
-                            {{if index .Settings "wechat_qr"}}
-                            <img loading="lazy" src="{{safeImageURL (index .Settings "wechat_qr")}}" class="w-full h-full object-cover">
-                            {{else}}
-                            <span class="text-gray-300 text-[10px]">未上传</span>
-                            {{end}}
+                    </div>
+                    <div id="page-banners" class="grid grid-cols-1 lg:grid-cols-2 gap-3">
+                        <div class="bg-gray-50/70 rounded-xl p-3 border border-gray-100/80">
+                            <h4 class="text-xs font-semibold text-gray-600 mb-2 flex items-center gap-1.5"><span class="w-1 h-4 bg-indigo-400 rounded-full inline-block"></span>首页</h4>
+                            <div class="space-y-1.5">
+                                <div class="flex items-center gap-2">
+                                    <label class="flex-shrink-0 bg-indigo-50 text-indigo-600 text-[11px] font-medium px-3 py-1.5 rounded-lg cursor-pointer hover:bg-indigo-100 transition">
+                                        <i class="fa-solid fa-cloud-arrow-up mr-1"></i>上传
+                                        <input type="file" name="banner_file" accept="image/*" class="hidden" onchange="previewBanner(this, 'banner-preview-index')">
+                                    </label>
+                                    <input type="text" name="banner_url" placeholder="或填写 URL" value="{{safeImageURL (index .Settings "banner_url")}}" class="flex-1 border border-gray-200 rounded-lg px-2.5 py-1.5 text-[11px] outline-none focus:ring-1 focus:ring-indigo-200 focus:border-indigo-400">
+                                </div>
+                                <div id="banner-preview-index" class="overflow-hidden rounded-lg h-20 bg-gray-100 border border-gray-100">
+                                    {{if index .Settings "banner_url"}}
+                                    <img loading="lazy" src="{{safeImageURL (index .Settings "banner_url")}}" class="w-full h-full object-cover">
+                                    {{else}}
+                                    <div class="w-full h-full flex items-center justify-center text-gray-300 text-[10px]"><i class="fa-regular fa-image mr-1"></i>默认使用置顶文章封面</div>
+                                    {{end}}
+                                </div>
+                            </div>
+                        </div>
+                        <div class="bg-gray-50/70 rounded-xl p-3 border border-gray-100/80 page-banner-item">
+                            <h4 class="text-xs font-semibold text-gray-600 mb-2 flex items-center gap-1.5"><span class="w-1 h-4 bg-blue-400 rounded-full inline-block"></span>文章页</h4>
+                            <div class="space-y-1.5">
+                                <div class="flex items-center gap-2">
+                                    <label class="flex-shrink-0 bg-blue-50 text-blue-600 text-[11px] font-medium px-3 py-1.5 rounded-lg cursor-pointer hover:bg-blue-100 transition">
+                                        <i class="fa-solid fa-cloud-arrow-up mr-1"></i>上传
+                                        <input type="file" name="banner_file_posts" accept="image/*" class="hidden" onchange="previewBanner(this, 'banner-preview-posts')">
+                                    </label>
+                                    <input type="text" name="banner_url_posts" placeholder="或填写 URL" value="{{safeImageURL (index .Settings "banner_url_posts")}}" class="flex-1 border border-gray-200 rounded-lg px-2.5 py-1.5 text-[11px] outline-none focus:ring-1 focus:ring-blue-200 focus:border-blue-400">
+                                </div>
+                                <div id="banner-preview-posts" class="overflow-hidden rounded-lg h-20 bg-gray-100 border border-gray-100">
+                                    {{if index .Settings "banner_url_posts"}}
+                                    <img loading="lazy" src="{{safeImageURL (index .Settings "banner_url_posts")}}" class="w-full h-full object-cover">
+                                    {{else}}
+                                    <div class="w-full h-full flex items-center justify-center text-gray-300 text-[10px]"><i class="fa-regular fa-image mr-1"></i>未设置则用首页 Banner</div>
+                                    {{end}}
+                                </div>
+                            </div>
+                        </div>
+                        <div class="bg-gray-50/70 rounded-xl p-3 border border-gray-100/80 page-banner-item">
+                            <h4 class="text-xs font-semibold text-gray-600 mb-2 flex items-center gap-1.5"><span class="w-1 h-4 bg-emerald-400 rounded-full inline-block"></span>瞬间页</h4>
+                            <div class="space-y-1.5">
+                                <div class="flex items-center gap-2">
+                                    <label class="flex-shrink-0 bg-emerald-50 text-emerald-600 text-[11px] font-medium px-3 py-1.5 rounded-lg cursor-pointer hover:bg-emerald-100 transition">
+                                        <i class="fa-solid fa-cloud-arrow-up mr-1"></i>上传
+                                        <input type="file" name="banner_file_moments" accept="image/*" class="hidden" onchange="previewBanner(this, 'banner-preview-moments')">
+                                    </label>
+                                    <input type="text" name="banner_url_moments" placeholder="或填写 URL" value="{{safeImageURL (index .Settings "banner_url_moments")}}" class="flex-1 border border-gray-200 rounded-lg px-2.5 py-1.5 text-[11px] outline-none focus:ring-1 focus:ring-emerald-200 focus:border-emerald-400">
+                                </div>
+                                <div id="banner-preview-moments" class="overflow-hidden rounded-lg h-20 bg-gray-100 border border-gray-100">
+                                    {{if index .Settings "banner_url_moments"}}
+                                    <img loading="lazy" src="{{safeImageURL (index .Settings "banner_url_moments")}}" class="w-full h-full object-cover">
+                                    {{else}}
+                                    <div class="w-full h-full flex items-center justify-center text-gray-300 text-[10px]"><i class="fa-regular fa-image mr-1"></i>未设置则用首页 Banner</div>
+                                    {{end}}
+                                </div>
+                            </div>
+                        </div>
+                        <div class="bg-gray-50/70 rounded-xl p-3 border border-gray-100/80 page-banner-item">
+                            <h4 class="text-xs font-semibold text-gray-600 mb-2 flex items-center gap-1.5"><span class="w-1 h-4 bg-rose-400 rounded-full inline-block"></span>留言板</h4>
+                            <div class="space-y-1.5">
+                                <div class="flex items-center gap-2">
+                                    <label class="flex-shrink-0 bg-rose-50 text-rose-600 text-[11px] font-medium px-3 py-1.5 rounded-lg cursor-pointer hover:bg-rose-100 transition">
+                                        <i class="fa-solid fa-cloud-arrow-up mr-1"></i>上传
+                                        <input type="file" name="banner_file_guestbook" accept="image/*" class="hidden" onchange="previewBanner(this, 'banner-preview-guestbook')">
+                                    </label>
+                                    <input type="text" name="banner_url_guestbook" placeholder="或填写 URL" value="{{safeImageURL (index .Settings "banner_url_guestbook")}}" class="flex-1 border border-gray-200 rounded-lg px-2.5 py-1.5 text-[11px] outline-none focus:ring-1 focus:ring-rose-200 focus:border-rose-400">
+                                </div>
+                                <div id="banner-preview-guestbook" class="overflow-hidden rounded-lg h-20 bg-gray-100 border border-gray-100">
+                                    {{if index .Settings "banner_url_guestbook"}}
+                                    <img loading="lazy" src="{{safeImageURL (index .Settings "banner_url_guestbook")}}" class="w-full h-full object-cover">
+                                    {{else}}
+                                    <div class="w-full h-full flex items-center justify-center text-gray-300 text-[10px]"><i class="fa-regular fa-image mr-1"></i>未设置则用首页 Banner</div>
+                                    {{end}}
+                                </div>
+                            </div>
                         </div>
                     </div>
                 </div>
-                <div>
-                    <label class="text-xs font-medium text-gray-500 mb-1 block">支付宝收款码</label>
-                    <div class="space-y-2">
-                        <label class="inline-flex bg-blue-50 text-blue-600 text-xs font-medium px-4 py-2 rounded-xl cursor-pointer hover:bg-blue-100 transition">
-                            <i class="fa-brands fa-alipay mr-1.5"></i>上传支付宝码
-                            <input type="file" name="alipay_qr_file" accept="image/*" class="hidden" onchange="previewQR(this, 'alipay-preview')">
-                        </label>
-                        {{if index .Settings "alipay_qr"}}<input type="hidden" name="alipay_qr" value="{{safeImageURL (index .Settings "alipay_qr")}}">{{end}}
-                        <div id="alipay-preview" class="w-28 h-28 rounded-xl border border-gray-100 bg-gray-50 flex items-center justify-center overflow-hidden">
-                            {{if index .Settings "alipay_qr"}}
-                            <img loading="lazy" src="{{safeImageURL (index .Settings "alipay_qr")}}" class="w-full h-full object-cover">
-                            {{else}}
-                            <span class="text-gray-300 text-[10px]">未上传</span>
-                            {{end}}
+                <div class="pt-2 border-t border-gray-100">
+                    <h4 class="text-xs font-medium text-gray-500 mb-3 flex items-center gap-1.5"><i class="fa-solid fa-qrcode text-indigo-500"></i>赞赏收款码</h4>
+                    <p class="text-[11px] text-gray-400 -mt-2 mb-3">上传后，文章详情页将显示赞赏按钮，悬停弹出收款码</p>
+                    <div class="grid grid-cols-2 gap-4">
+                        <div>
+                            <label class="text-xs font-medium text-gray-500 mb-1 block">微信收款码</label>
+                            <div class="space-y-2">
+                                <label class="inline-flex bg-green-50 text-green-600 text-xs font-medium px-4 py-2 rounded-xl cursor-pointer hover:bg-green-100 transition">
+                                    <i class="fa-brands fa-weixin mr-1.5"></i>上传微信码
+                                    <input type="file" name="wechat_qr_file" accept="image/*" class="hidden" onchange="previewQR(this, 'wechat-preview')">
+                                </label>
+                                {{if index .Settings "wechat_qr"}}<input type="hidden" name="wechat_qr" value="{{safeImageURL (index .Settings "wechat_qr")}}">{{end}}
+                                <div id="wechat-preview" class="w-28 h-28 rounded-xl border border-gray-100 bg-gray-50 flex items-center justify-center overflow-hidden">
+                                    {{if index .Settings "wechat_qr"}}
+                                    <img loading="lazy" src="{{safeImageURL (index .Settings "wechat_qr")}}" class="w-full h-full object-cover">
+                                    {{else}}
+                                    <span class="text-gray-300 text-[10px]">未上传</span>
+                                    {{end}}
+                                </div>
+                            </div>
+                        </div>
+                        <div>
+                            <label class="text-xs font-medium text-gray-500 mb-1 block">支付宝收款码</label>
+                            <div class="space-y-2">
+                                <label class="inline-flex bg-blue-50 text-blue-600 text-xs font-medium px-4 py-2 rounded-xl cursor-pointer hover:bg-blue-100 transition">
+                                    <i class="fa-brands fa-alipay mr-1.5"></i>上传支付宝码
+                                    <input type="file" name="alipay_qr_file" accept="image/*" class="hidden" onchange="previewQR(this, 'alipay-preview')">
+                                </label>
+                                {{if index .Settings "alipay_qr"}}<input type="hidden" name="alipay_qr" value="{{safeImageURL (index .Settings "alipay_qr")}}">{{end}}
+                                <div id="alipay-preview" class="w-28 h-28 rounded-xl border border-gray-100 bg-gray-50 flex items-center justify-center overflow-hidden">
+                                    {{if index .Settings "alipay_qr"}}
+                                    <img loading="lazy" src="{{safeImageURL (index .Settings "alipay_qr")}}" class="w-full h-full object-cover">
+                                    {{else}}
+                                    <span class="text-gray-300 text-[10px]">未上传</span>
+                                    {{end}}
+                                </div>
+                            </div>
                         </div>
                     </div>
+                </div>
+            </div>
+
+            <!-- Tab 3: 安全 & 地图 -->
+            <div class="settings-panel p-6 space-y-5 hidden" id="panel-security">
+                <div>
+                    <label class="text-xs font-medium text-gray-500 mb-1 block">敏感词库（逗号分隔）</label>
+                    <textarea name="sensitive_words" rows="4" placeholder="多个敏感词用英文逗号分隔，如：词1,词2,词3" class="w-full border border-gray-200 rounded-xl px-4 py-2.5 text-sm outline-none focus:ring-2 focus:ring-indigo-200 focus:border-indigo-400 resize-none">{{index .Settings "sensitive_words"}}</textarea>
+                </div>
+                <div class="grid grid-cols-2 gap-4">
+                    <div>
+                        <label class="text-xs font-medium text-gray-500 mb-1 block">评论频率限制（次/分钟）</label>
+                        <input type="number" name="comment_limit_count" min="1" value="{{index .Settings "comment_limit_count"}}" class="w-full border border-gray-200 rounded-xl px-4 py-2.5 text-sm outline-none focus:ring-2 focus:ring-indigo-200 focus:border-indigo-400">
+                    </div>
+                    <div>
+                        <label class="text-xs font-medium text-gray-500 mb-1 block">限制时间窗口（分钟）</label>
+                        <input type="number" name="comment_limit_minute" min="1" value="{{index .Settings "comment_limit_minute"}}" class="w-full border border-gray-200 rounded-xl px-4 py-2.5 text-sm outline-none focus:ring-2 focus:ring-indigo-200 focus:border-indigo-400">
+                    </div>
+                </div>
+                <div>
+                    <label class="text-xs font-medium text-gray-500 mb-1 block">高德地图 Key</label>
+                    <input type="text" name="amap_key" value="{{index .Settings "amap_key"}}" placeholder="前往 https://lbs.amap.com 申请 Web端 JS API Key" class="w-full border border-gray-200 rounded-xl px-4 py-2.5 text-sm outline-none focus:ring-2 focus:ring-indigo-200 focus:border-indigo-400">
+                    <p class="text-[11px] text-gray-400 mt-1">用于「关于我」页面的足迹地图</p>
+                </div>
+                <div>
+                    <label class="text-xs font-medium text-gray-500 mb-1 block">高德安全密钥</label>
+                    <input type="text" name="amap_jscode" value="{{index .Settings "amap_jscode"}}" placeholder="高德控制台 → 应用管理 → 查看安全密钥（jscode）" class="w-full border border-gray-200 rounded-xl px-4 py-2.5 text-sm outline-none focus:ring-2 focus:ring-indigo-200 focus:border-indigo-400">
+                </div>
+                <div class="pt-2 border-t border-gray-100">
+                    <h4 class="text-xs font-medium text-gray-500 mb-3">站点地图</h4>
+                    <p class="text-xs text-gray-400 mb-3">一键生成 sitemap.xml，方便搜索引擎收录。</p>
+                    <a href="/admin/sitemap" class="inline-flex items-center bg-green-500 text-white text-xs px-4 py-2 rounded-xl font-medium hover:bg-green-600 transition"><i class="fa-solid fa-sitemap mr-1"></i>生成站点地图</a>
                 </div>
             </div>
         </div>
@@ -194,15 +209,27 @@
         </div>
     </form>
 
-        <div class="bg-white rounded-2xl p-6 shadow-xs border border-gray-100/50">
-            <h3 class="text-sm font-bold text-gray-500 mb-4">站点地图</h3>
-            <p class="text-xs text-gray-400 mb-3">一键生成 sitemap.xml，方便搜索引擎收录。</p>
-            <form method="GET" action="/admin/sitemap">
-                <button type="submit" class="bg-green-500 text-white text-xs px-4 py-2 rounded-xl font-medium hover:bg-green-600 transition"><i class="fa-solid fa-sitemap mr-1"></i>生成站点地图</button>
-            </form>
-        </div>
-
     <script>
+    // Tab 切换 + 恢复
+    (function() {
+        var tabs = document.querySelectorAll('.settings-tab');
+        var panels = document.querySelectorAll('.settings-panel');
+        function activate(name) {
+            sessionStorage.setItem('settings_tab', name);
+            tabs.forEach(function(t) { t.classList.remove('active','text-indigo-600','border-indigo-600','bg-indigo-50/30'); t.classList.add('text-gray-400','border-transparent'); });
+            var active = document.querySelector('.settings-tab[data-tab="'+name+'"]');
+            active.classList.add('active','text-indigo-600','border-indigo-600','bg-indigo-50/30');
+            active.classList.remove('text-gray-400','border-transparent');
+            panels.forEach(function(p) { p.classList.add('hidden'); });
+            document.getElementById('panel-'+name).classList.remove('hidden');
+        }
+        tabs.forEach(function(tab) {
+            tab.addEventListener('click', function() { activate(tab.dataset.tab); });
+        });
+        // 恢复
+        var saved = sessionStorage.getItem('settings_tab');
+        if (saved && saved !== 'basic') activate(saved);
+    })();
     function previewBanner(input, previewId) {
         var preview = document.getElementById(previewId);
         if (input.files && input.files[0]) {
@@ -221,7 +248,6 @@
             item.style.pointerEvents = checkbox.checked ? 'none' : 'auto';
         });
     }
-    // 初始状态
     togglePageBanners();
     function previewQR(input, previewId) {
         var preview = document.getElementById(previewId);
