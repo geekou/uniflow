@@ -208,6 +208,7 @@ var (
 	siteSettingsCachedAt  time.Time
 	siteSettingsCacheMu   sync.RWMutex
 	siteSettingsCacheTTL  = 30 * time.Second
+	cachedAdminName       string // getAdminDisplayName 全生命周期缓存，重启后重查
 )
 
 // InvalidateSiteSettingsCache 使站点设置缓存失效，供后台修改设置后调用。
@@ -259,11 +260,15 @@ func getSiteSettings(db *sql.DB) (map[string]string, error) {
 }
 
 func getAdminDisplayName(db *sql.DB) string {
+	if cachedAdminName != "" {
+		return cachedAdminName
+	}
 	var username string
 	db.QueryRow("SELECT username FROM users WHERE role='admin' LIMIT 1").Scan(&username)
 	if username == "" {
 		username = "HuiNan"
 	}
+	cachedAdminName = username
 	return username
 }
 
@@ -941,7 +946,7 @@ func PostDetailHandler(db *sql.DB) gin.HandlerFunc {
 		vid, _ := c.Cookie("visitor_id")
 		if vid == "" {
 			vid = uuid.New().String()[:8]
-			c.SetCookie("visitor_id", vid, 365*24*3600, "/", "", false, true)
+			setVisitorCookie(c, vid, 365*24*3600)
 		}
 		today := time.Now().Format("2006-01-02")
 		res, _ := db.Exec("INSERT OR IGNORE INTO post_visits (post_id, visitor_id, visit_date) VALUES (?, ?, ?)", id, vid, today)
@@ -1172,7 +1177,7 @@ func MomentLikeHandler(db *sql.DB) gin.HandlerFunc {
 		vid, _ := c.Cookie("visitor_id")
 		if vid == "" {
 			vid = uuid.New().String()[:8]
-			c.SetCookie("visitor_id", vid, 365*24*3600, "/", "", false, true)
+			setVisitorCookie(c, vid, 365*24*3600)
 		}
 
 		// 用事务保证点赞/取消与计数的一致性，避免竞态
@@ -1301,6 +1306,7 @@ SiteAuthor:       getAdminDisplayName(db),
 			"SiteSubtitle":     data.SiteSubtitle,
 			"SiteFoundedAt":    data.SiteFoundedAt,
 			"SiteNotification": data.SiteNotification,
+			"SiteAuthor":       data.SiteAuthor,
 			"AboutMe":          data.AboutMe,
 			"Menus":            data.Menus,
 			"Stats":            data.Stats,

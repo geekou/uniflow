@@ -50,10 +50,16 @@ func execLog(db *sql.DB, query string, args ...interface{}) {
 	}
 }
 
-func adminData(title, activeMenu, activeSubmenu, username string, db *sql.DB) gin.H {
+func adminData(title, activeMenu, activeSubmenu, username string, db *sql.DB, c *gin.Context) gin.H {
 	var foundedAt string
 	if db != nil {
 		db.QueryRow("SELECT value FROM system_settings WHERE key='site_founded_at'").Scan(&foundedAt)
+	}
+	csrfToken := ""
+	if c != nil {
+		if t, ok := c.Get("csrf_token"); ok {
+			csrfToken, _ = t.(string)
+		}
 	}
 	return gin.H{
 		"PageTitle":     title,
@@ -62,7 +68,20 @@ func adminData(title, activeMenu, activeSubmenu, username string, db *sql.DB) gi
 		"ActiveSubmenu": activeSubmenu,
 		"Username":      username,
 		"SiteFoundedAt": foundedAt,
+		"CSRFToken":     csrfToken,
 	}
+}
+
+// sanitizeIcon 清洗菜单图标字段，仅允许字母、数字、空格和连字符
+func sanitizeIcon(s string) string {
+	// fontawesome class 格式: "fa-solid fa-home"
+	var b strings.Builder
+	for _, r := range s {
+		if (r >= 'a' && r <= 'z') || (r >= 'A' && r <= 'Z') || (r >= '0' && r <= '9') || r == ' ' || r == '-' {
+			b.WriteRune(r)
+		}
+	}
+	return strings.TrimSpace(b.String())
 }
 
 func getAdminUsername(c *gin.Context) string {
@@ -140,7 +159,7 @@ func AdminLogout(c *gin.Context) {
 
 func AdminDashboard(db *sql.DB, version string) gin.HandlerFunc {
 	return func(c *gin.Context) {
-		data := adminData("仪表盘", "dashboard", "", getAdminUsername(c), db)
+		data := adminData("仪表盘", "dashboard", "", getAdminUsername(c), db, c)
 
 		// 合并为单条 SQL，减少数据库查询次数
 		var postCount, momentCount, commentCount, guestbookCount int
@@ -162,7 +181,7 @@ func AdminDashboard(db *sql.DB, version string) gin.HandlerFunc {
 
 func AdminPostList(db *sql.DB) gin.HandlerFunc {
 	return func(c *gin.Context) {
-		data := adminData("文章列表", "posts", "post_list", getAdminUsername(c), db)
+		data := adminData("文章列表", "posts", "post_list", getAdminUsername(c), db, c)
 		data["Mode"] = "list"
 
 		// 搜索和筛选
@@ -247,7 +266,7 @@ func normalizePostStatus(status string) string {
 
 func AdminPostCreate(db *sql.DB) gin.HandlerFunc {
 	return func(c *gin.Context) {
-		data := adminData("发布文章", "posts", "post_create", getAdminUsername(c), db)
+		data := adminData("发布文章", "posts", "post_create", getAdminUsername(c), db, c)
 		data["Mode"] = "create"
 		data["Post"] = models.Post{} // 传入Post对象，避免模板nil
 		data["PostContentJS"] = ""
@@ -342,7 +361,7 @@ func AdminPostCreatePost(db *sql.DB) gin.HandlerFunc {
 
 func AdminPostEdit(db *sql.DB) gin.HandlerFunc {
 	return func(c *gin.Context) {
-		data := adminData("编辑文章", "posts", "post_list", getAdminUsername(c), db)
+		data := adminData("编辑文章", "posts", "post_list", getAdminUsername(c), db, c)
 		data["Mode"] = "edit"
 
 		id, _ := strconv.ParseInt(c.Param("id"), 10, 64)
@@ -362,7 +381,8 @@ func AdminPostEdit(db *sql.DB) gin.HandlerFunc {
 		}
 
 		data["Post"] = p
-		contentJSON, _ := json.Marshal(p.Content)
+		// 防止内容中的 </script> 提前关闭 script 标签导致 XSS
+		contentJSON, _ := json.Marshal(strings.ReplaceAll(p.Content, "</", "<\\/"))
 		data["PostContentJS"] = template.JS(contentJSON)
 		data["IsTop"] = p.IsTop == 1
 		data["Privacy"] = p.Privacy
@@ -605,7 +625,7 @@ func savePostTags(db *sql.DB, postID int64, tagStrs []string) {
 
 func AdminCategories(db *sql.DB) gin.HandlerFunc {
 	return func(c *gin.Context) {
-		data := adminData("分类管理", "posts", "categories", getAdminUsername(c), db)
+		data := adminData("分类管理", "posts", "categories", getAdminUsername(c), db, c)
 
 		rows, _ := db.Query("SELECT c.id, c.name, c.slug, c.created_at, COUNT(p.id) FROM categories c LEFT JOIN posts p ON p.category_id = c.id GROUP BY c.id ORDER BY c.name")
 		var cats []gin.H
@@ -683,7 +703,7 @@ func AdminCategoryDelete(db *sql.DB) gin.HandlerFunc {
 
 func AdminTags(db *sql.DB) gin.HandlerFunc {
 	return func(c *gin.Context) {
-		data := adminData("标签管理", "posts", "tags", getAdminUsername(c), db)
+		data := adminData("标签管理", "posts", "tags", getAdminUsername(c), db, c)
 
 		rows, _ := db.Query("SELECT t.id, t.name, COUNT(pt.post_id) FROM tags t LEFT JOIN post_tags pt ON t.id = pt.tag_id GROUP BY t.id ORDER BY t.name")
 		var tags []gin.H
@@ -739,7 +759,7 @@ func AdminTagDelete(db *sql.DB) gin.HandlerFunc {
 
 func AdminMomentList(db *sql.DB) gin.HandlerFunc {
 	return func(c *gin.Context) {
-		data := adminData("瞬间列表", "moments", "list", getAdminUsername(c), db)
+		data := adminData("瞬间列表", "moments", "list", getAdminUsername(c), db, c)
 		data["Mode"] = "list"
 
 		searchQuery := strings.TrimSpace(c.Query("q"))
@@ -787,7 +807,7 @@ func AdminMomentList(db *sql.DB) gin.HandlerFunc {
 
 func AdminMomentCreate(db *sql.DB) gin.HandlerFunc {
 	return func(c *gin.Context) {
-		data := adminData("发布瞬间", "moments", "create", getAdminUsername(c), db)
+		data := adminData("发布瞬间", "moments", "create", getAdminUsername(c), db, c)
 		data["Mode"] = "create"
 		data["Moment"] = models.Moment{}
 		c.HTML(http.StatusOK, "admin/moment.html", data)
@@ -870,7 +890,7 @@ func AdminMomentCreatePost(db *sql.DB) gin.HandlerFunc {
 
 func AdminMomentEdit(db *sql.DB) gin.HandlerFunc {
 	return func(c *gin.Context) {
-		data := adminData("编辑瞬间", "moments", "list", getAdminUsername(c), db)
+		data := adminData("编辑瞬间", "moments", "list", getAdminUsername(c), db, c)
 		data["Mode"] = "edit"
 
 		id, _ := strconv.ParseInt(c.Param("id"), 10, 64)
@@ -1015,7 +1035,7 @@ func AdminMomentDelete(db *sql.DB) gin.HandlerFunc {
 
 func AdminComments(db *sql.DB) gin.HandlerFunc {
 	return func(c *gin.Context) {
-		data := adminData("评论管理", "messages", "comments", getAdminUsername(c), db)
+		data := adminData("评论管理", "messages", "comments", getAdminUsername(c), db, c)
 
 		searchQuery := strings.TrimSpace(c.Query("q"))
 		filterType := strings.TrimSpace(c.Query("type"))
@@ -1126,7 +1146,7 @@ func AdminCommentReply(db *sql.DB) gin.HandlerFunc {
 
 func AdminGuestbook(db *sql.DB) gin.HandlerFunc {
 	return func(c *gin.Context) {
-		data := adminData("留言管理", "messages", "guestbook", getAdminUsername(c), db)
+		data := adminData("留言管理", "messages", "guestbook", getAdminUsername(c), db, c)
 
 		searchQuery := strings.TrimSpace(c.Query("q"))
 		data["SearchQuery"] = searchQuery
@@ -1217,7 +1237,7 @@ func AdminGuestbookDelete(db *sql.DB) gin.HandlerFunc {
 
 func AdminMedia(db *sql.DB) gin.HandlerFunc {
 	return func(c *gin.Context) {
-		data := adminData("媒体管理", "media", c.DefaultQuery("type", "photos"), getAdminUsername(c), db)
+		data := adminData("媒体管理", "media", c.DefaultQuery("type", "photos"), getAdminUsername(c), db, c)
 		data["Type"] = c.DefaultQuery("type", "photos")
 
 		uploadsDir := filepath.Join(getProjectRoot(c), "uploads")
@@ -1364,7 +1384,8 @@ func AdminMediaDelete(db *sql.DB) gin.HandlerFunc {
 		}
 		projectRoot := getProjectRoot(c)
 		if err := deleteMediaFile(projectRoot, name); err != nil {
-			c.JSON(http.StatusBadRequest, gin.H{"ok": false, "msg": err.Error()})
+			log.Printf("[MediaDelete] %v", err)
+			c.JSON(http.StatusBadRequest, gin.H{"ok": false, "msg": "删除失败，请检查文件名或重试"})
 			return
 		}
 		c.JSON(http.StatusOK, gin.H{"ok": true})
@@ -1448,7 +1469,7 @@ func isVideoExt(ext string) bool {
 
 func AdminSettings(db *sql.DB) gin.HandlerFunc {
 	return func(c *gin.Context) {
-		data := adminData("网站设置", "settings", "site", getAdminUsername(c), db)
+		data := adminData("网站设置", "settings", "site", getAdminUsername(c), db, c)
 		settings, _ := getSiteSettings(db)
 		data["Settings"] = settings
 		c.HTML(http.StatusOK, "admin/settings.html", data)
@@ -1506,7 +1527,8 @@ func AdminSettingsPost(db *sql.DB) gin.HandlerFunc {
 				{"banner_file_guestbook", "banner_url_guestbook", "banner_url_guestbook"},
 			} {
 				if err := processBannerUpload(db, c, bp.f, bp.u, bp.k); err != nil {
-					c.JSON(http.StatusBadRequest, gin.H{"ok": false, "msg": err.Error()})
+					log.Printf("[BannerUpload] %v", err)
+					c.JSON(http.StatusBadRequest, gin.H{"ok": false, "msg": "封面上传失败，请检查文件格式或重试"})
 					return
 				}
 			}
@@ -1563,7 +1585,7 @@ func AdminSettingsPost(db *sql.DB) gin.HandlerFunc {
 
 func AdminAbout(db *sql.DB) gin.HandlerFunc {
 	return func(c *gin.Context) {
-		data := adminData("关于我", "settings", "about", getAdminUsername(c), db)
+		data := adminData("关于我", "settings", "about", getAdminUsername(c), db, c)
 
 		var raw string
 		db.QueryRow("SELECT value FROM system_settings WHERE key='about_me_json'").Scan(&raw)
@@ -1754,7 +1776,7 @@ func AdminSitemap(db *sql.DB) gin.HandlerFunc {
 			}
 
 		logOperation(db, getAdminUsername(c), c, "生成站点地图")
-		data := adminData("站点地图", "settings", "sitemap", getAdminUsername(c), db)
+		data := adminData("站点地图", "settings", "sitemap", getAdminUsername(c), db, c)
 		data["SitemapPath"] = path
 		c.HTML(http.StatusOK, "admin/sitemap.html", data)
 	}
@@ -1764,7 +1786,7 @@ func AdminSitemap(db *sql.DB) gin.HandlerFunc {
 
 func AdminUsers(db *sql.DB) gin.HandlerFunc {
 	return func(c *gin.Context) {
-		data := adminData("用户管理", "system", "users", getAdminUsername(c), db)
+		data := adminData("用户管理", "system", "users", getAdminUsername(c), db, c)
 
 		rows, _ := db.Query("SELECT id, username, role, avatar_url, created_at FROM users ORDER BY id")
 		var users []gin.H
@@ -1970,7 +1992,7 @@ func AdminUserDelete(db *sql.DB) gin.HandlerFunc {
 
 func AdminMenus(db *sql.DB) gin.HandlerFunc {
 	return func(c *gin.Context) {
-		data := adminData("菜单管理", "system", "menus", getAdminUsername(c), db)
+		data := adminData("菜单管理", "system", "menus", getAdminUsername(c), db, c)
 
 		// 管理后台显示所有菜单（含隐藏的）
 		rows, _ := db.Query("SELECT id, name, url, icon, parent_id, order_num, is_system, visible FROM menus ORDER BY order_num, id")
@@ -2017,13 +2039,14 @@ func AdminMenuSave(db *sql.DB) gin.HandlerFunc {
 			return
 		}
 		url := utils.SafeURL(c.PostForm("url"))
-		icon := c.PostForm("icon")
+		icon := sanitizeIcon(c.PostForm("icon"))
 		orderNum, _ := strconv.Atoi(c.PostForm("order_num"))
 		parentID, _ := strconv.ParseInt(c.PostForm("parent_id"), 10, 64)
 
 		if _, err := db.Exec("INSERT INTO menus (name, url, icon, parent_id, order_num, is_system, visible) VALUES (?,?,?,?,?,0,1)",
 			name, url, icon, nilIfZero(parentID), orderNum); err != nil {
-			c.JSON(http.StatusInternalServerError, gin.H{"ok": false, "msg": "保存失败: " + err.Error()})
+			log.Printf("[MenuSave] %v", err)
+			c.JSON(http.StatusInternalServerError, gin.H{"ok": false, "msg": "菜单保存失败，请重试"})
 			return
 		}
 
@@ -2037,7 +2060,7 @@ func AdminMenuUpdate(db *sql.DB) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		id, _ := strconv.ParseInt(c.PostForm("id"), 10, 64)
 		name := strings.TrimSpace(c.PostForm("name"))
-		icon := c.PostForm("icon")
+		icon := sanitizeIcon(c.PostForm("icon"))
 		orderNum, _ := strconv.Atoi(c.PostForm("order_num"))
 		visible := c.PostForm("visible") == "1"
 
@@ -2077,7 +2100,7 @@ func AdminMenuDelete(db *sql.DB) gin.HandlerFunc {
 
 func AdminPages(db *sql.DB) gin.HandlerFunc {
 	return func(c *gin.Context) {
-		data := adminData("页面管理", "system", "pages", getAdminUsername(c), db)
+		data := adminData("页面管理", "system", "pages", getAdminUsername(c), db, c)
 		data["Mode"] = "list"
 
 		rows, _ := db.Query("SELECT id, title, slug, created_at FROM pages ORDER BY id")
@@ -2105,7 +2128,7 @@ func AdminPages(db *sql.DB) gin.HandlerFunc {
 
 func AdminPageCreate(db *sql.DB) gin.HandlerFunc {
 	return func(c *gin.Context) {
-		data := adminData("新建页面", "system", "pages", getAdminUsername(c), db)
+		data := adminData("新建页面", "system", "pages", getAdminUsername(c), db, c)
 		data["Mode"] = "create"
 		data["Page"] = models.Page{}
 		c.HTML(http.StatusOK, "admin/page.html", data)
@@ -2141,7 +2164,7 @@ func AdminPageCreatePost(db *sql.DB) gin.HandlerFunc {
 
 func AdminPageEdit(db *sql.DB) gin.HandlerFunc {
 	return func(c *gin.Context) {
-		data := adminData("编辑页面", "system", "pages", getAdminUsername(c), db)
+		data := adminData("编辑页面", "system", "pages", getAdminUsername(c), db, c)
 		data["Mode"] = "edit"
 
 		id, _ := strconv.ParseInt(c.Param("id"), 10, 64)
@@ -2211,7 +2234,7 @@ func AdminPageDelete(db *sql.DB) gin.HandlerFunc {
 
 func AdminBackup(db *sql.DB) gin.HandlerFunc {
 	return func(c *gin.Context) {
-		data := adminData("备份恢复", "system", "backup", getAdminUsername(c), db)
+		data := adminData("备份恢复", "system", "backup", getAdminUsername(c), db, c)
 
 		projectRoot := getProjectRoot(c)
 		backups, err := utils.ListBackups(filepath.Join(projectRoot, "backups"))
@@ -2277,7 +2300,8 @@ func AdminBackupRestore(db *sql.DB) gin.HandlerFunc {
 		projectRoot := getProjectRoot(c)
 		backupFile, _, err := resolveBackupPath(projectRoot, c.Param("name"))
 		if err != nil {
-			c.JSON(http.StatusBadRequest, gin.H{"ok": false, "msg": err.Error()})
+			log.Printf("[BackupRestore] %v", err)
+			c.JSON(http.StatusBadRequest, gin.H{"ok": false, "msg": "备份文件名无效"})
 			return
 		}
 
@@ -2332,7 +2356,8 @@ func AdminBackupDelete(db *sql.DB) gin.HandlerFunc {
 		projectRoot := getProjectRoot(c)
 		backupPath, _, err := resolveBackupPath(projectRoot, c.Param("name"))
 		if err != nil {
-			c.JSON(http.StatusBadRequest, gin.H{"ok": false, "msg": err.Error()})
+			log.Printf("[BackupDelete] %v", err)
+			c.JSON(http.StatusBadRequest, gin.H{"ok": false, "msg": "备份文件无效"})
 			return
 		}
 		if err := utils.DeleteBackup(backupPath); err != nil {
@@ -2422,7 +2447,7 @@ func AdminBackupUpload(db *sql.DB) gin.HandlerFunc {
 
 func AdminLogs(db *sql.DB) gin.HandlerFunc {
 	return func(c *gin.Context) {
-		data := adminData("日志管理", "system", "logs", getAdminUsername(c), db)
+		data := adminData("日志管理", "system", "logs", getAdminUsername(c), db, c)
 		data["LogType"] = c.DefaultQuery("type", "login")
 
 		logType := c.DefaultQuery("type", "login")
@@ -2737,7 +2762,7 @@ func PostLikeHandler(db *sql.DB) gin.HandlerFunc {
 		vid, _ := c.Cookie("visitor_id")
 		if vid == "" {
 			vid = uuid.New().String()[:8]
-			c.SetCookie("visitor_id", vid, 365*24*3600, "/", "", false, true)
+			setVisitorCookie(c, vid, 365*24*3600)
 		}
 
 		// 用事务保证点赞/取消与计数的一致性
@@ -2806,7 +2831,7 @@ func PostDislikeHandler(db *sql.DB) gin.HandlerFunc {
 		vid, _ := c.Cookie("visitor_id")
 		if vid == "" {
 			vid = uuid.New().String()[:8]
-			c.SetCookie("visitor_id", vid, 365*24*3600, "/", "", false, true)
+			setVisitorCookie(c, vid, 365*24*3600)
 		}
 
 		tx, txErr := db.Begin()
@@ -3042,14 +3067,13 @@ func CommentLike(db *sql.DB) gin.HandlerFunc {
 			anonID, err := c.Cookie("_aid")
 			if err != nil || anonID == "" {
 				anonID = uuid.New().String()
-				secure := c.Request.TLS != nil && !strings.HasPrefix(c.Request.Host, "localhost") && !strings.HasPrefix(c.Request.Host, "127.0.0.1")
 				http.SetCookie(c.Writer, &http.Cookie{
 					Name:     "_aid",
 					Value:    anonID,
 					Path:     "/",
 					MaxAge:   365 * 24 * 3600,
 					HttpOnly: true,
-					Secure:   secure,
+					Secure:   shouldUseSecureCookie(c),
 					SameSite: http.SameSiteLaxMode,
 				})
 			}
@@ -3102,7 +3126,7 @@ func CommentLike(db *sql.DB) gin.HandlerFunc {
 
 func AdminDevices(db *sql.DB) gin.HandlerFunc {
 	return func(c *gin.Context) {
-		data := adminData("设备管理", "settings", "devices", getAdminUsername(c), db)
+		data := adminData("设备管理", "settings", "devices", getAdminUsername(c), db, c)
 		rows, _ := db.Query("SELECT id, name, image_url, info, order_num FROM devices ORDER BY order_num ASC, id ASC")
 		var devices []models.Device
 		if rows != nil {
@@ -3184,7 +3208,7 @@ func AdminDeviceDelete(db *sql.DB) gin.HandlerFunc {
 
 func AdminFootprints(db *sql.DB) gin.HandlerFunc {
 	return func(c *gin.Context) {
-		data := adminData("足迹管理", "settings", "footprints", getAdminUsername(c), db)
+		data := adminData("足迹管理", "settings", "footprints", getAdminUsername(c), db, c)
 		var raw string
 		db.QueryRow("SELECT value FROM system_settings WHERE key='footprints_json'").Scan(&raw)
 		var footprints []map[string]interface{}

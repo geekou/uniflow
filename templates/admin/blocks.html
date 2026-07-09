@@ -144,6 +144,21 @@
 {{define "admin_tail"}}
     </main>
 
+    <!-- CSRF Token 自动注入所有表单 -->
+    <script>
+    (function() {
+        var token = '{{.CSRFToken}}';
+        document.querySelectorAll('form[method="POST"]').forEach(function(f) {
+            if (f.querySelector('input[name="_csrf"]')) return;
+            var inp = document.createElement('input');
+            inp.type = 'hidden';
+            inp.name = '_csrf';
+            inp.value = token;
+            f.appendChild(inp);
+        });
+    })();
+    </script>
+
     <!-- Toast notification -->
     <div id="toast" class="fixed top-20 right-6 z-50 hidden">
         <div id="toast-content" class="px-4 py-3 rounded-xl shadow-lg text-sm font-medium"></div>

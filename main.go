@@ -100,9 +100,9 @@ func main() {
 		c.Next()
 	})
 
-	// ============ 首次部署引导（无需认证） ============
+	// ============ 首次部署引导（无需认证，使用基础 CSRF 防护） ============
 	r.GET("/setup", handlers.SetupPage(models.DB))
-	r.POST("/setup", handlers.SetupPost(models.DB))
+	r.POST("/setup", handlers.CSRFMiddleware(), handlers.SetupPost(models.DB))
 
 	// ============ 静态资源 ============
 	r.Static("/static", filepath.Join(projectRoot, "static"))

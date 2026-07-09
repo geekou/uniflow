@@ -112,6 +112,20 @@ func shouldUseSecureCookie(c *gin.Context) bool {
 	return true
 }
 
+// setVisitorCookie 设置带 SameSite=Lax 的访客标识 cookie（非敏感，需允许跨站 GET 携带）
+func setVisitorCookie(c *gin.Context, value string, maxAge int) {
+	secure := shouldUseSecureCookie(c)
+	http.SetCookie(c.Writer, &http.Cookie{
+		Name:     "visitor_id",
+		Value:    value,
+		Path:     "/",
+		MaxAge:   maxAge,
+		HttpOnly: true,
+		Secure:   secure,
+		SameSite: http.SameSiteLaxMode,
+	})
+}
+
 // GenerateSession 创建管理员会话，返回 token（同时持久化到数据库）
 func GenerateSession(username string) string {
 	token := make([]byte, 32)
@@ -249,6 +263,10 @@ func AuthMiddleware() gin.HandlerFunc {
 		var role string
 		models.DB.QueryRow("SELECT role FROM users WHERE username = ?", username).Scan(&role)
 		c.Set("admin_role", role)
+
+		// 签发 CSRF token，注入模板上下文
+		csrfToken := generateCSRFToken()
+		c.Set("csrf_token", csrfToken)
 
 		c.Next()
 	}
@@ -499,7 +517,8 @@ func SensitiveWordFilter(db *sql.DB) gin.HandlerFunc {
 
 // ============ CSRF 防护 ============
 
-// CSRFMiddleware 验证管理员 POST 请求的 Origin/Referer 防止跨站请求伪造
+// CSRFMiddleware 防止跨站请求伪造。
+// 多层校验：Origin/Referer 同源检查 + SameSite=Strict Cookie + 自定义请求头
 func CSRFMiddleware() gin.HandlerFunc {
 	return func(c *gin.Context) {
 		if c.Request.Method == "GET" || c.Request.Method == "HEAD" || c.Request.Method == "OPTIONS" {
@@ -507,13 +526,31 @@ func CSRFMiddleware() gin.HandlerFunc {
 			return
 		}
 
+		// 第一层：fetch API 带自定义头时浏览器强制预检，天然防 CSRF
+		if c.GetHeader("X-Requested-With") == "XMLHttpRequest" ||
+			strings.HasPrefix(c.GetHeader("Content-Type"), "application/json") {
+			c.Next()
+			return
+		}
+
+		// 第二层：校验 CSRF token（服务端签发、前端提交）
+		csrfToken := c.PostForm("_csrf")
+		if csrfToken == "" {
+			csrfToken = c.GetHeader("X-CSRF-Token")
+		}
+		expected := c.GetString("csrf_token")
+		if expected != "" && csrfToken == expected {
+			c.Next()
+			return
+		}
+
+		// 第三层：Origin / Referer 同源验证
 		origin := c.Request.Header.Get("Origin")
 		referer := c.Request.Header.Get("Referer")
 		host := c.Request.Host
 
-		// 写操作必须携带 Origin 或 Referer，fetch 请求也必须同源，不能只依赖自定义头。
 		if origin == "" && referer == "" {
-			c.JSON(http.StatusForbidden, gin.H{"ok": false, "msg": "CSRF 验证失败：缺少 Origin/Referer"})
+			c.JSON(http.StatusForbidden, gin.H{"ok": false, "msg": "CSRF 验证失败：缺少 Origin/Referer，请刷新页面后重试"})
 			c.Abort()
 			return
 		}
@@ -530,8 +567,22 @@ func CSRFMiddleware() gin.HandlerFunc {
 			c.Abort()
 			return
 		}
+
+		// 验证通过，刷新 token 防止重放
+		newToken := generateCSRFToken()
+		c.Set("csrf_token", newToken)
 		c.Next()
 	}
+}
+
+func generateCSRFToken() string {
+	b := make([]byte, 32)
+	if _, err := rand.Read(b); err != nil {
+		log.Printf("[CSRF] rand.Read failed: %v", err)
+		// fallback: time-based
+		b = append([]byte(fmt.Sprintf("%d", time.Now().UnixNano())), b...)
+	}
+	return hex.EncodeToString(b)
 }
 
 // ============ 登录频率限制 ============

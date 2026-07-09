@@ -1,6 +1,19 @@
 {{define "partials/footer-scripts"}}
 {{template "partials/backtotop" .}}
 <script>
+// 浏览器回退时从 BFCache 恢复可能导致访问量等动态数据显示旧值
+// 只在列表页（首页/文章列表）做无感刷新，不影响详情页表单数据
+window.addEventListener('pageshow', function(e) {
+    if (e.persisted || (window.performance && window.performance.navigation && window.performance.navigation.type === 2)) {
+        var path = location.pathname;
+        // 详情页保留 BFCache（避免评论表单丢失），列表页强制刷新
+        if (path === '/' || path === '/posts' || path === '/moments' || path === '/guestbook' || path === '/about') {
+            location.reload();
+        }
+    }
+});
+</script>
+<script>
 (function() {
     var ob = document.getElementById('open-sidebar'), cb = document.getElementById('close-sidebar'),
         sb = document.getElementById('sidebar'), ov = document.getElementById('sidebar-overlay');
