@@ -161,7 +161,7 @@
 
         <!-- Tab 3: 足迹管理 -->
         <div class="about-panel hidden p-6 space-y-6" id="panel-footprints">
-            <form id="fp-form" class="space-y-3">
+            <form id="fp-form" class="space-y-3" enctype="multipart/form-data">
                 <input type="hidden" name="index" id="fp-index" value="-1">
                 <div class="grid grid-cols-1 sm:grid-cols-3 gap-3">
                     <div>
@@ -172,6 +172,15 @@
                         <label class="text-xs font-medium text-gray-500 mb-1 block">备注</label>
                         <input type="text" name="note" id="fp-note" placeholder="如：2023年旅行" class="w-full border border-gray-200 rounded-xl px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-indigo-200 focus:border-indigo-400">
                     </div>
+                    <div>
+                        <label class="text-xs font-medium text-gray-500 mb-1 block">照片（多选）</label>
+                        <div class="flex gap-2 items-center">
+                            <input type="file" name="photos" id="fp-photos" multiple accept="image/*" onchange="fpPreviewPhotos()" class="block w-full text-xs text-gray-400 file:mr-3 file:py-1.5 file:px-3 file:rounded-lg file:border-0 file:text-xs file:bg-indigo-50 file:text-indigo-600 hover:file:bg-indigo-100">
+                            <button type="button" onclick="openMediaBrowser()" class="shrink-0 text-xs px-3 py-1.5 rounded-lg border border-gray-200 text-gray-500 hover:bg-gray-50 hover:text-indigo-600 transition"><i class="fa-regular fa-images mr-1"></i>媒体库</button>
+                        </div>
+                        <input type="hidden" name="media_urls" id="fp-media-urls" value="">
+                        <div id="fp-photos-preview" class="flex gap-2 mt-2 overflow-x-auto"></div>
+                    </div>
                 </div>
                 <div class="flex items-center gap-3">
                     <button type="submit" class="bg-indigo-600 text-white text-xs px-5 py-2 rounded-xl font-medium hover:bg-indigo-700 transition">保存</button>
@@ -181,7 +190,7 @@
             <div class="pt-4 border-t border-gray-100">
                 <table class="w-full text-sm" id="fp-table">
                     <thead class="bg-gray-50/50 text-xs text-gray-400">
-                        <tr><th class="text-left px-4 py-3">#</th><th class="text-left px-4 py-3">地名</th><th class="text-left px-4 py-3">坐标</th><th class="text-left px-4 py-3">备注</th><th class="text-left px-4 py-3">操作</th></tr>
+                        <tr><th class="text-left px-4 py-3">#</th><th class="text-left px-4 py-3">地名</th><th class="text-left px-4 py-3">坐标</th><th class="text-left px-4 py-3">备注</th><th class="text-left px-4 py-3">照片</th><th class="text-left px-4 py-3">操作</th></tr>
                     </thead>
                     <tbody class="divide-y divide-gray-50">
                         {{range $i, $fp := .Footprints}}
@@ -190,6 +199,13 @@
                             <td class="px-4 py-3 font-medium text-gray-700 text-xs">{{$fp.name}}</td>
                             <td class="px-4 py-3 text-xs text-gray-500">{{$fp.lat}}, {{$fp.lng}}</td>
                             <td class="px-4 py-3 text-xs text-gray-400">{{$fp.note}}</td>
+                            <td class="px-4 py-3">
+                                {{if $fp.photos}}
+                                <div class="flex gap-1">
+                                    {{range $p := $fp.photos}}<img src="{{$p}}" data-url="{{$p}}" class="w-6 h-6 rounded object-cover">{{end}}
+                                </div>
+                                {{else}}-{{end}}
+                            </td>
                             <td class="px-4 py-3">
                                 <div class="flex items-center space-x-2">
                                     <button onclick='editFP({{$i}}, `{{$fp.name}}`, {{$fp.lat}}, {{$fp.lng}}, `{{$fp.note}}`)' class="text-xs text-indigo-500 hover:text-indigo-700"><i class="fa-solid fa-pen-to-square"></i></button>
@@ -201,6 +217,32 @@
                     </tbody>
                 </table>
                 {{if eq (len .Footprints) 0}}<div class="text-center py-8 text-sm text-gray-400">暂无足迹，在上方添加</div>{{end}}
+            </div>
+
+            <!-- 媒体库选择弹窗 -->
+            <div id="fp-media-overlay" class="fixed inset-0 bg-black/40 z-50 hidden flex items-center justify-center" onclick="closeFpMediaPicker(event)">
+                <div class="bg-white rounded-2xl shadow-2xl w-full max-w-3xl max-h-[80vh] flex flex-col m-4" onclick="event.stopPropagation()">
+                    <div class="flex items-center justify-between p-4 border-b border-gray-100">
+                        <div class="flex items-center gap-2">
+                            <h3 class="text-sm font-bold text-gray-700">选择照片</h3>
+                            <div class="flex bg-gray-100 rounded-lg p-0.5">
+                                <button class="fp-picker-tab px-3 py-1 text-xs rounded-md transition active bg-white shadow-xs text-gray-700" data-type="photos" onclick="switchFpPickerTab('photos', this)">图片</button>
+                                <button class="fp-picker-tab px-3 py-1 text-xs rounded-md transition text-gray-400" data-type="videos" onclick="switchFpPickerTab('videos', this)">视频</button>
+                            </div>
+                        </div>
+                        <button onclick="closeFpMediaPickerDirect()" class="text-gray-400 hover:text-gray-600 text-lg leading-none">&times;</button>
+                    </div>
+                    <div id="fp-picker-grid" class="grid grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-3 p-4 overflow-y-auto flex-1">
+                        <div class="col-span-full text-center py-8 text-sm text-gray-400">加载中...</div>
+                    </div>
+                    <div class="px-4 py-3 border-t border-gray-100 flex justify-between items-center">
+                        <span id="fp-picker-count" class="text-xs text-gray-400">已选 0 张（上限10张）</span>
+                        <div class="flex gap-2">
+                            <button onclick="closeFpMediaPickerDirect()" class="text-xs px-4 py-2 rounded-xl border border-gray-200 text-gray-500 hover:bg-gray-50">取消</button>
+                            <button onclick="confirmFpMedia()" class="text-xs px-4 py-2 rounded-xl bg-indigo-600 text-white hover:bg-indigo-700">确定</button>
+                        </div>
+                    </div>
+                </div>
             </div>
         </div>
     </div>
@@ -323,15 +365,192 @@
     // ====== 足迹 ======
     document.getElementById('fp-form').addEventListener('submit', function(e) {
         e.preventDefault();
-        fetch('/admin/footprints/save', { method: 'POST', body: new URLSearchParams(new FormData(this)) })
+        var fd = new FormData(this);
+        // 移除原始 file input，手动追加跟踪的文件
+        fd.delete('photos');
+        fpUploadedFiles.forEach(function(f) { fd.append('photos', f); });
+        fetch('/admin/footprints/save', { method: 'POST', body: fd })
             .then(r => r.json()).then(data => { if (data.ok) location.reload(); else alert(data.msg || '保存失败'); })
             .catch(() => alert('网络错误'));
     });
+    function fpPreviewPhotos() {
+        var files = document.getElementById('fp-photos').files;
+        for (var i = 0; i < files.length; i++) {
+            fpUploadedFiles.push(files[i]);
+        }
+        renderFpPreviews();
+    }
+    function renderFpPreviews() {
+        var box = document.getElementById('fp-photos-preview');
+        box.innerHTML = '';
+        // 媒体库选择的图片
+        fpSelectedMedia.forEach(function(m, idx) {
+            var div = document.createElement('div');
+            div.className = 'relative';
+            div.style.cssText = 'width:48px;height:48px;flex-shrink:0';
+            div.innerHTML = '<img src="'+m.url+'" style="width:48px;height:48px;object-fit:cover;border-radius:6px"><button type="button" onclick="removeFpMedia('+idx+')" class="absolute -top-1.5 -right-1.5 w-4 h-4 bg-red-500 text-white rounded-full text-[8px] flex items-center justify-center">&times;</button>';
+            box.appendChild(div);
+        });
+        // 本地上传的图片
+        fpUploadedFiles.forEach(function(f, idx) {
+            var r = new FileReader();
+            r.onload = function(e) {
+                var div = document.createElement('div');
+                div.className = 'relative';
+                div.style.cssText = 'width:48px;height:48px;flex-shrink:0';
+                div.innerHTML = '<img src="'+e.target.result+'" style="width:48px;height:48px;object-fit:cover;border-radius:6px"><button type="button" onclick="removeFpUpload('+idx+')" class="absolute -top-1.5 -right-1.5 w-4 h-4 bg-red-500 text-white rounded-full text-[8px] flex items-center justify-center">&times;</button>';
+                box.appendChild(div);
+            };
+            r.readAsDataURL(f);
+        });
+    }
+    function removeFpMedia(idx) {
+        fpSelectedMedia.splice(idx, 1);
+        document.getElementById('fp-media-urls').value = fpSelectedMedia.map(function(m){return m.url;}).join(',');
+        renderFpPreviews();
+    }
+    function removeFpUpload(idx) {
+        fpUploadedFiles.splice(idx, 1);
+        renderFpPreviews();
+    }
     function editFP(index, name, lat, lng, note) {
         document.getElementById('fp-index').value = index; document.getElementById('fp-name').value = name;
         document.getElementById('fp-note').value = note || ''; document.getElementById('fp-cancel').classList.remove('hidden');
+        // 预填已有照片
+        fpSelectedMedia = []; fpUploadedFiles = [];
+        var rows = document.querySelectorAll('#fp-table tbody tr');
+        if (index >= 0 && index < rows.length) {
+            var imgs = rows[index].querySelectorAll('img');
+            imgs.forEach(function(img) {
+                var u = img.dataset.url || img.getAttribute('src');
+                if (u) fpSelectedMedia.push({url: u, name: u.split('/').pop()});
+            });
+        }
+        document.getElementById('fp-media-urls').value = fpSelectedMedia.map(function(m){return m.url;}).join(',');
+        renderFpPreviews();
     }
-    function cancelFpEdit() { document.getElementById('fp-form').reset(); document.getElementById('fp-index').value = '-1'; document.getElementById('fp-cancel').classList.add('hidden'); }
+    function cancelFpEdit() {
+        document.getElementById('fp-form').reset(); document.getElementById('fp-index').value = '-1';
+        document.getElementById('fp-cancel').classList.add('hidden');
+        fpSelectedMedia = []; fpUploadedFiles = [];
+        document.getElementById('fp-media-urls').value = '';
+        renderFpPreviews();
+    }
     function confirmFpAction(msg, url) { if (confirm(msg)) fetch(url, { method: 'POST' }).then(r => r.json()).then(data => { if (data.ok) location.reload(); }); }
+
+    // ====== 足迹媒体库选择（复用moment弹窗模式） ======
+    var _fpPickerType = 'photos';
+    var fpSelectedMedia = []; // [{url, name}]
+    var fpUploadedFiles = []; // File objects from input
+
+    function openMediaBrowser() {
+        fpSelectedMedia = [];
+        // 预填已选URL
+        var existing = document.getElementById('fp-media-urls').value;
+        if (existing) {
+            existing.split(',').forEach(function(u) {
+                u = u.trim();
+                if (u) fpSelectedMedia.push({url: u, name: u.split('/').pop()});
+            });
+        }
+        _fpPickerType = 'photos';
+        document.getElementById('fp-media-overlay').classList.remove('hidden');
+        document.getElementById('fp-media-overlay').classList.add('flex');
+        document.querySelectorAll('.fp-picker-tab').forEach(function(t) {
+            t.classList.toggle('active', t.dataset.type === 'photos');
+            t.classList.toggle('bg-white', t.dataset.type === 'photos');
+            t.classList.toggle('shadow-xs', t.dataset.type === 'photos');
+            t.classList.toggle('text-gray-700', t.dataset.type === 'photos');
+            t.classList.toggle('text-gray-400', t.dataset.type !== 'photos');
+        });
+        loadFpMedia('photos');
+        updateFpPickerCount();
+    }
+
+    function closeFpMediaPicker(e) {
+        if (e && e.target !== document.getElementById('fp-media-overlay')) return;
+        closeFpMediaPickerDirect();
+    }
+    function closeFpMediaPickerDirect() {
+        document.getElementById('fp-media-overlay').classList.add('hidden');
+        document.getElementById('fp-media-overlay').classList.remove('flex');
+    }
+
+    function switchFpPickerTab(type, btn) {
+        document.querySelectorAll('.fp-picker-tab').forEach(function(t) {
+            t.classList.remove('active', 'bg-white', 'shadow-xs', 'text-gray-700');
+            t.classList.add('text-gray-400');
+        });
+        btn.classList.add('active', 'bg-white', 'shadow-xs', 'text-gray-700');
+        btn.classList.remove('text-gray-400');
+        loadFpMedia(type);
+    }
+
+    function loadFpMedia(type) {
+        var grid = document.getElementById('fp-picker-grid');
+        grid.innerHTML = '<div class="col-span-full text-center py-8 text-sm text-gray-400">加载中...</div>';
+        fetch('/admin/media/api?type=' + type, { credentials: 'same-origin', headers: {'X-Requested-With': 'fetch'} })
+            .then(function(r) { return r.json(); })
+            .then(function(res) {
+                if (!res.ok || !res.files || res.files.length === 0) {
+                    grid.innerHTML = '<div class="col-span-full text-center py-8 text-sm text-gray-400">暂无文件</div>';
+                    return;
+                }
+                var selectedUrls = fpSelectedMedia.map(function(m){return m.url;});
+                var html = '';
+                for (var i = 0; i < res.files.length; i++) {
+                    var f = res.files[i];
+                    var isSel = selectedUrls.indexOf(f.url) >= 0;
+                    html += '<div class="aspect-square bg-gray-100 rounded-xl overflow-hidden cursor-pointer border-2 transition relative group '+(isSel?'border-indigo-500':'border-transparent hover:border-indigo-400')+'" data-url="'+f.url+'" data-name="'+f.name+'" onclick="toggleFpMedia(this)">';
+                    if (type === 'photos') {
+                        html += '<img loading="lazy" src="'+f.url+'" class="w-full h-full object-cover">';
+                    } else {
+                        html += '<video src="'+f.url+'" class="w-full h-full object-cover" preload="metadata"></video>';
+                        html += '<div class="absolute inset-0 flex items-center justify-center"><div class="w-8 h-8 rounded-full bg-black/40 flex items-center justify-center"><i class="fa-solid fa-play text-white text-xs"></i></div></div>';
+                    }
+                    html += '<div class="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/50 to-transparent p-2 opacity-0 group-hover:opacity-100 transition"><p class="text-[10px] text-white line-clamp-1">'+f.name+'</p></div>';
+                    html += '<div class="absolute top-2 right-2 w-6 h-6 rounded-full '+(isSel?'bg-indigo-500':'bg-white/80')+' text-white text-[10px] flex items-center justify-center '+(isSel?'':'opacity-0 group-hover:opacity-100')+' transition">'+(isSel?'<i class="fa-solid fa-check"></i>':'<i class="fa-solid fa-check" style="color:#9ca3af"></i>')+'</div>';
+                    html += '</div>';
+                }
+                grid.innerHTML = html;
+            })
+            .catch(function() {
+                grid.innerHTML = '<div class="col-span-full text-center py-8 text-sm text-red-400">加载失败，请重试</div>';
+            });
+    }
+
+    function toggleFpMedia(el) {
+        var url = el.dataset.url;
+        var name = el.dataset.name;
+        var idx = -1;
+        for (var i = 0; i < fpSelectedMedia.length; i++) {
+            if (fpSelectedMedia[i].url === url) { idx = i; break; }
+        }
+        if (idx >= 0) {
+            fpSelectedMedia.splice(idx, 1);
+        } else if (fpSelectedMedia.length < 10) {
+            fpSelectedMedia.push({url: url, name: name});
+        }
+        updateFpPickerCount();
+        loadFpMedia(_fpPickerType); // 刷新选中状态
+    }
+
+    function updateFpPickerCount() {
+        document.getElementById('fp-picker-count').textContent = '已选 ' + fpSelectedMedia.length + ' 张（上限10张）';
+    }
+
+    function confirmFpMedia() {
+        var urls = fpSelectedMedia.map(function(m){return m.url;});
+        document.getElementById('fp-media-urls').value = urls.join(',');
+        renderFpPreviews();
+        closeFpMediaPickerDirect();
+    }
+
+    function updateFpPreview() {
+        var urls = document.getElementById('fp-media-urls').value;
+        var box = document.getElementById('fp-photos-preview');
+        if (!urls) { box.innerHTML = ''; return; }
+        box.innerHTML = urls.split(',').map(function(u){return '<img src="'+u+'" style="width:48px;height:48px;object-fit:cover;border-radius:6px;flex-shrink:0">';}).join('');
+    }
     </script>
 {{template "admin_tail" .}}

@@ -138,8 +138,21 @@
                             if(status!=='complete'||!result.districtList||!result.districtList.length)return;
                             var bds=result.districtList[0].boundaries;
                             if(!bds||!bds.length)return;
+                            var photos='';
+                            if(p.photos&&p.photos.length){
+                                var id='fp-'+p.name.replace(/[^a-zA-Z0-9\u4e00-\u9fa5]/g,'');
+                                // 图片列表存到全局
+                                window[id]=p.photos;
+                                photos='<div style="display:flex;gap:6px;overflow-x:auto;padding-top:6px;margin-top:2px;max-width:260px">';
+                                p.photos.forEach(function(u,i){
+                                    photos+='<img src="'+u+'" data-fp-id="'+id+'" data-fp-idx="'+i+'" style="width:100px;height:70px;object-fit:cover;border-radius:6px;flex-shrink:0;cursor:pointer" loading="lazy">';
+                                });
+                                photos+='</div>';
+                            }else{
+                                photos='';
+                            }
                             var tip=p.note?'<div style="color:#6b7280;font-size:12px;margin-top:2px">'+p.note+'</div>':'';
-                            var html='<div style="padding:6px 12px;background:#fff;border-radius:8px;box-shadow:0 2px 12px rgba(0,0,0,.12);font-size:13px"><b style="color:#4f46e5">'+p.name+'</b>'+tip+'</div>';
+                            var html='<div style="padding:8px 12px;background:#fff;border-radius:10px;box-shadow:0 4px 20px rgba(0,0,0,.15);font-size:13px;max-width:280px"><b style="color:#4f46e5">'+p.name+'</b>'+tip+photos+'</div>';
                             bds.forEach(function(bd){
                                 var poly=new AMap.Polygon({
                                     path:bd,
@@ -155,10 +168,34 @@
                                     poly.setOptions({fillOpacity:0.28,strokeWeight:2.5,strokeOpacity:1,strokeStyle:'solid',fillColor:'#a78bfa'});
                                     iw.setContent(html);
                                     iw.open(map,e.lnglat);
+                                    // 等DOM渲染后给弹窗绑事件
+                                    setTimeout(bindIwHover, 200);
                                 });
                                 poly.on('mouseout',function(){
                                     poly.setOptions({fillOpacity:0.12,strokeWeight:1,strokeOpacity:0.6,strokeStyle:'dashed',fillColor:'#818cf8'});
                                 });
+                                function bindIwHover() {
+                                    var box = document.querySelector('.amap-info-content') ||
+                                              document.querySelector('.amap-info-window') ||
+                                              document.querySelector('[class*="amap-info"]');
+                                    if (box) {
+                                        box.onmouseenter = function() { box._keepOpen = true; };
+                                        box.onmouseleave = function() { box._keepOpen = false; setTimeout(function(){ if(!box._keepOpen) iw.close(); }, 300); };
+                                        box.querySelectorAll('*').forEach(function(el) {
+                                            el.onmouseenter = function() { box._keepOpen = true; };
+                                            el.onmouseleave = function(e) { e.stopPropagation(); };
+                                        });
+                                        // 给足迹照片绑定点击放大
+                                        box.querySelectorAll('[data-fp-id]').forEach(function(img) {
+                                            img.onclick = function(e) {
+                                                e.stopPropagation();
+                                                var id = img.getAttribute('data-fp-id');
+                                                var idx = parseInt(img.getAttribute('data-fp-idx'));
+                                                showBigPhoto(box, id, idx);
+                                            };
+                                        });
+                                    }
+                                }
                                 polys.push(poly);
                             })
                         })
@@ -170,6 +207,40 @@
         document.head.appendChild(s);
         }, 500);
     });
+
+    // 足迹照片在信息窗内放大
+    function showBigPhoto(box, id, idx) {
+        var list = window[id];
+        if (!list || !list.length) return;
+        // 隐藏原内容，显示大图
+        var orig = box.querySelector('.iw-original');
+        if (!orig) {
+            orig = document.createElement('div');
+            orig.className = 'iw-original';
+            while (box.firstChild) orig.appendChild(box.firstChild);
+            box.appendChild(orig);
+        }
+        var big = box.querySelector('.iw-big');
+        if (!big) {
+            big = document.createElement('div');
+            big.className = 'iw-big';
+            big.style.cssText = 'display:none;text-align:center;min-width:240px';
+            box.appendChild(big);
+        }
+        orig.style.display = 'none';
+        big.style.display = 'block';
+        var html = '<div style="text-align:right;margin-bottom:4px"><button onclick="var b=this.closest(\'.iw-big\');b.style.display=\'none\';b.parentElement.querySelector(\'.iw-original\').style.display=\'block\'" style="background:#f3f4f6;border:none;border-radius:6px;padding:2px 8px;font-size:12px;cursor:pointer;color:#6b7280">← 返回</button></div>';
+        html += '<img src="'+list[idx]+'" style="width:240px;height:180px;object-fit:cover;border-radius:8px;margin-bottom:6px">';
+        // 底部缩略图条
+        if (list.length > 1) {
+            html += '<div style="display:flex;gap:4px;overflow-x:auto;max-width:240px;justify-content:center">';
+            list.forEach(function(u, i) {
+                html += '<img src="'+u+'" style="width:36px;height:36px;object-fit:cover;border-radius:4px;flex-shrink:0;cursor:pointer;border:'+(i===idx?'2px solid #6366f1':'2px solid transparent')+'" onclick="var list=window[\''+id+'\'];this.parentElement.previousElementSibling.src=list['+i+'];var imgs=this.parentElement.querySelectorAll(\'img\');imgs.forEach(function(m){m.style.border=\'2px solid transparent\'});this.style.border=\'2px solid #6366f1\'">';
+            });
+            html += '</div>';
+        }
+        big.innerHTML = html;
+    }
 
     // 三栏同步滚轮：到边界的栏停止，未到边界的栏继续
     (function() {
@@ -189,7 +260,7 @@
         }
         function syncWheel(e) {
             if (!media.matches || e.ctrlKey || e.metaKey) return;
-            if (e.target.closest('textarea, input, select, [contenteditable="true"], .glightbox-container')) return;
+            if (e.target.closest('textarea, input, select, [contenteditable="true"], .glightbox-container, #footprint-map, .amap-container')) return;
             var delta = e.deltaY;
             if (e.deltaMode === 1) delta *= 16; else if (e.deltaMode === 2) delta *= window.innerHeight;
             if (!delta) return;

@@ -5,7 +5,7 @@
 
     <div class="bg-white rounded-2xl p-6 shadow-xs border border-gray-100/50 space-y-6">
         <!-- 添加/编辑 -->
-        <form id="fp-form" class="space-y-3">
+        <form id="fp-form" class="space-y-3" enctype="multipart/form-data">
             <input type="hidden" name="index" id="fp-index" value="-1">
             <div class="grid grid-cols-1 sm:grid-cols-3 gap-3">
                 <div>
@@ -15,6 +15,11 @@
                 <div>
                     <label class="text-xs font-medium text-gray-500 mb-1 block">备注</label>
                     <input type="text" name="note" id="fp-note" placeholder="如：2023年旅行" class="w-full border border-gray-200 rounded-xl px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-indigo-200 focus:border-indigo-400">
+                </div>
+                <div>
+                    <label class="text-xs font-medium text-gray-500 mb-1 block">照片（多选）</label>
+                    <input type="file" name="photos" id="fp-photos" multiple accept="image/*" onchange="previewPhotos()" class="block w-full text-xs text-gray-400 file:mr-3 file:py-1.5 file:px-3 file:rounded-lg file:border-0 file:text-xs file:bg-indigo-50 file:text-indigo-600 hover:file:bg-indigo-100">
+                    <div id="fp-photos-preview" class="flex gap-2 mt-2 overflow-x-auto"></div>
                 </div>
             </div>
             <div class="flex items-center gap-3">
@@ -27,7 +32,7 @@
         <div class="pt-4 border-t border-gray-100">
             <table class="w-full text-sm" id="fp-table">
                 <thead class="bg-gray-50/50 text-xs text-gray-400">
-                    <tr><th class="text-left px-4 py-3">#</th><th class="text-left px-4 py-3">地名</th><th class="text-left px-4 py-3">坐标</th><th class="text-left px-4 py-3">备注</th><th class="text-left px-4 py-3">操作</th></tr>
+                    <tr><th class="text-left px-4 py-3">#</th><th class="text-left px-4 py-3">地名</th><th class="text-left px-4 py-3">坐标</th><th class="text-left px-4 py-3">备注</th><th class="text-left px-4 py-3">照片</th><th class="text-left px-4 py-3">操作</th></tr>
                 </thead>
                 <tbody class="divide-y divide-gray-50">
                     {{range $i, $fp := .Footprints}}
@@ -36,6 +41,7 @@
                         <td class="px-4 py-3 font-medium text-gray-700">{{$fp.name}}</td>
                         <td class="px-4 py-3 text-xs text-gray-500">{{$fp.lat}}, {{$fp.lng}}</td>
                         <td class="px-4 py-3 text-xs text-gray-400">{{$fp.note}}</td>
+                        <td class="px-4 py-3 text-xs text-gray-400">{{if $fp.photos}}{{len $fp.photos}}张{{else}}-{{end}}</td>
                         <td class="px-4 py-3">
                             <div class="flex items-center space-x-2">
                                 <button onclick='editFP({{$i}}, {{$fp.name}}, {{$fp.lat}}, {{$fp.lng}}, {{$fp.note}})' class="text-xs text-indigo-500 hover:text-indigo-700"><i class="fa-solid fa-pen-to-square"></i></button>
@@ -54,11 +60,27 @@
         document.getElementById('fp-form').addEventListener('submit', function(e) {
             e.preventDefault();
             var fd = new FormData(this);
-            fetch('/admin/footprints/save', { method: 'POST', body: new URLSearchParams(fd) })
+            fetch('/admin/footprints/save', { method: 'POST', body: fd })
                 .then(r => r.json())
                 .then(data => { if (data.ok) location.reload(); else alert(data.msg || '保存失败'); })
                 .catch(() => alert('网络错误'));
         });
+
+        function previewPhotos() {
+            var files = document.getElementById('fp-photos').files;
+            var box = document.getElementById('fp-photos-preview');
+            box.innerHTML = '';
+            for (var i = 0; i < files.length && i < 6; i++) {
+                var r = new FileReader();
+                r.onload = function(e) {
+                    var img = document.createElement('img');
+                    img.src = e.target.result;
+                    img.style.cssText = 'width:48px;height:48px;object-fit:cover;border-radius:6px;flex-shrink:0';
+                    box.appendChild(img);
+                };
+                r.readAsDataURL(files[i]);
+            }
+        }
 
         function editFP(index, name, lat, lng, note) {
             document.getElementById('fp-index').value = index;

@@ -22,7 +22,7 @@ import (
 )
 
 // Version 当前版本号
-const Version = "v1.6.1"
+const Version = "v1.6.5"
 
 // splitWords 按字母/数字连续段统计英文单词。
 func splitWords(s string) []string {
@@ -409,7 +409,8 @@ func main() {
 		adminOnly.POST("/devices/save", handlers.AdminDeviceSave(db))
 		adminOnly.POST("/devices/delete/:id", handlers.AdminDeviceDelete(db))
 
-		// 足迹管理（API）
+		// 足迹管理
+		adminOnly.GET("/footprints", handlers.AdminFootprints(db))
 		adminOnly.POST("/footprints/save", handlers.AdminFootprintSave(db))
 		adminOnly.POST("/footprints/delete/:index", handlers.AdminFootprintDelete(db))
 		adminOnly.GET("/sitemap", handlers.AdminSitemap(db))

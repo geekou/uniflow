@@ -3233,6 +3233,36 @@ func AdminFootprintSave(db *sql.DB) gin.HandlerFunc {
 			return
 		}
 
+		// 处理照片上传
+		projectRoot := getProjectRoot(c)
+		fpDir := filepath.Join(projectRoot, "uploads", "footprints")
+		os.MkdirAll(fpDir, 0755)
+		var photoURLs []string
+		form, _ := c.MultipartForm()
+		if form != nil {
+			files := form.File["photos"]
+			for _, fh := range files {
+				ext := filepath.Ext(fh.Filename)
+				if ext == "" {
+					ext = ".jpg"
+				}
+				fname := uuid.New().String()[:12] + ext
+				dst := filepath.Join(fpDir, fname)
+				if err := c.SaveUploadedFile(fh, dst); err == nil {
+					photoURLs = append(photoURLs, "/uploads/footprints/"+fname)
+				}
+			}
+		}
+		// 从媒体库选择的图片URL
+		if mediaURLs := c.PostForm("media_urls"); mediaURLs != "" {
+			for _, u := range strings.Split(mediaURLs, ",") {
+				u = strings.TrimSpace(u)
+				if u != "" {
+					photoURLs = append(photoURLs, u)
+				}
+			}
+		}
+
 		// 用事务串行化读-改-写，避免并发覆盖
 		tx, err := db.Begin()
 		if err != nil {
@@ -3250,17 +3280,36 @@ func AdminFootprintSave(db *sql.DB) gin.HandlerFunc {
 
 		entry := map[string]interface{}{"name": name, "lat": lat, "lng": lng, "note": note}
 		if index >= 0 && index < len(list) {
+			// 编辑时合并旧照片
+			if existing, ok := list[index]["photos"]; ok {
+				if arr, ok := existing.([]interface{}); ok {
+					for _, u := range arr {
+						if s, ok := u.(string); ok {
+							photoURLs = append(photoURLs, s)
+						}
+					}
+				}
+			}
+			// 仅在有新照片上传或已有照片时才设置 photos 字段
+			if len(photoURLs) > 0 {
+				entry["photos"] = photoURLs
+			}
 			list[index] = entry
 		} else {
+			if len(photoURLs) > 0 {
+				entry["photos"] = photoURLs
+			}
 			list = append(list, entry)
 		}
 
 		newRaw, _ := json.Marshal(list)
 		if _, err := tx.Exec("INSERT OR REPLACE INTO system_settings (key, value) VALUES ('footprints_json', ?)", string(newRaw)); err != nil {
+			log.Printf("[FootprintSave] %v", err)
 			c.JSON(http.StatusInternalServerError, gin.H{"ok": false, "msg": "保存失败"})
 			return
 		}
 		if err := tx.Commit(); err != nil {
+			log.Printf("[FootprintSave] commit: %v", err)
 			c.JSON(http.StatusInternalServerError, gin.H{"ok": false, "msg": "保存失败"})
 			return
 		}
